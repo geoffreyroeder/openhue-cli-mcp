@@ -62,4 +62,53 @@
       </steps>
     </implementation>
   </decision>
+  
+  <decision>
+    <date>2023-04-03</date>
+    <title>Handle nil GroupedLight pointers</title>
+    <context>
+      A runtime panic occurs in the `set room` command when attempting to call `Set()` on a nil `GroupedLight`
+      pointer. This happens when a room returned by the Hue API doesn't have an associated GroupedLight service.
+    </context>
+    <options>
+      <option>
+        <name>Add nil check in the caller</name>
+        <pros>
+          - Fails fast, close to where the error occurs
+          - Provides specific user feedback about which room has the issue
+          - No change to method signatures or contracts
+        </pros>
+        <cons>
+          - Must be implemented in all calling code
+        </cons>
+      </option>
+      <option>
+        <name>Handle nil receiver in the Set method</name>
+        <pros>
+          - Centralized fix for all callers
+          - More defensive programming approach
+        </pros>
+        <cons>
+          - Less specific error messaging
+          - Changes method contract
+          - Obscures actual issue from callers
+        </cons>
+      </option>
+    </options>
+    <decision>
+      <chosen>Add nil check in the caller</chosen>
+      <rationale>
+        Following the principle of failing fast and providing clear user feedback. This approach
+        also maintains the original contract of the Set method and makes the limitation explicit
+        at the call site rather than hiding it in the method implementation.
+      </rationale>
+    </decision>
+    <implementation>
+      <steps>
+        <step>Added nil check before calling `Set()` in `cmd/set/set_room.go`</step>
+        <step>Added appropriate warning message for users</step>
+        <step>Added similar nil check in `cmd/get/get_room.go` to prevent similar issues</step>
+      </steps>
+    </implementation>
+  </decision>
 </decisions> 

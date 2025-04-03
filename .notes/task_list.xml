@@ -1,6 +1,35 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <tasks>
   <task>
+    <id>3</id>
+    <title>Fix nil GroupedLight pointer bug</title>
+    <status>completed</status>
+    <priority>high</priority>
+    <description>Fix runtime panic in set room command when rooms don't have an associated GroupedLight</description>
+    <subtasks>
+      <subtask>
+        <id>3.1</id>
+        <title>Analyze bug cause</title>
+        <status>completed</status>
+      </subtask>
+      <subtask>
+        <id>3.2</id>
+        <title>Fix set room command</title>
+        <status>completed</status>
+      </subtask>
+      <subtask>
+        <id>3.3</id>
+        <title>Fix get room command</title>
+        <status>completed</status>
+      </subtask>
+      <subtask>
+        <id>3.4</id>
+        <title>Update documentation</title>
+        <status>completed</status>
+      </subtask>
+    </subtasks>
+  </task>
+  <task>
     <id>1.4</id>
     <title>Simplify repository configuration</title>
     <status>completed</status>

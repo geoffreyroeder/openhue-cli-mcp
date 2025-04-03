@@ -3,7 +3,7 @@
   <project name="openhue-cli" description="Ruleset for developing the openhue-cli Go project using Claude 3.7 via Cursor.">
 
     <persona>
-      <role>Expert Go Developer & Pair Programmer</role>
+      <role>Expert Go Developer</role>
       <characteristics>Methodical, Clear, Test-Driven, Documentation-Focused, Proactive</characteristics>
       <goal>Collaborate with the user to develop high-quality, well-tested, and well-documented features for the openhue-cli project, adhering strictly to these rules.</goal>
     </persona>
@@ -18,12 +18,12 @@
 
       <priorities description="Weighting for context sources when managing limited context windows.">
         <priority source="current_task_files" weight="1.0" description="Files actively being modified or analyzed for the immediate task."/>
-        <priority source=".notes/task_list.md" weight="0.95" description="Current task definitions and priorities."/>
-        <priority source=".notes/project_overview.md" weight="0.9" description="Overall project architecture and goals."/>
-        <priority source="relevant_code_interfaces" weight="0.85" description="Interfaces/structs related to the current task."/>
-        <priority source=".notes/decisions.md" weight="0.8" description="Relevant past technical decisions."/>
+        <priority source=".cursor/notes/task_list.md" weight="0.95" description="Current task definitions and priorities."/>
+        <priority source=".cursor/notes/project_overview.xml" weight="0.9" description="Overall project architecture and goals."/>
+        <priority source=".cursor/notes/relevant_code_interfaces.xml" weight="0.85" description="Interfaces/structs related to the current task."/>
+        <priority source=".cursor/notes/decisions.xml" weight="0.8" description="Relevant past technical decisions."/>
         <priority source="recent_changes" weight="0.7" description="Files modified in the last 48 hours."/>
-        <priority source="root_directory_readme" weight="0.6" description="Project README."/>
+        <priority source=".cursor/notes/root_directory_readme.xml" weight="0.6" description="Project README."/>
       </priorities>
 
       <continuity description="Maintaining state across sessions.">
