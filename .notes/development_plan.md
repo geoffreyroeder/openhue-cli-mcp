@@ -1,20 +1,18 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <development_plan>
-  <title>Fork Development Setup</title>
+  <title>Fork Development Setup (Revised)</title>
   <steps>
     <step>
       <id>1</id>
-      <title>Configure Git Remotes</title>
+      <title>Configure Git Remote</title>
       <commands>
         <command>git remote -v</command>
-        <command>git remote rename origin upstream</command>
-        <command>git remote add origin git@github.com:geoffreyroeder/openhue-cli-mcp.git</command>
+        <command>git remote set-url origin git@github.com:geoffreyroeder/openhue-cli-mcp.git</command>
         <command>git fetch origin</command>
-        <command>git fetch upstream</command>
       </commands>
       <explanation>
-        First rename the current origin to upstream, then add your fork as the new origin.
-        This allows pushing changes to your fork while being able to pull updates from upstream.
+        Set your fork as the sole remote for the repository.
+        This isolates your development environment from the original repository.
       </explanation>
     </step>
     <step>
@@ -26,7 +24,7 @@
       </commands>
       <explanation>
         Create a new branch for development work and push it to your fork.
-        This keeps your main branch clean for syncing with upstream.
+        This keeps your main branch clean for reference purposes.
       </explanation>
     </step>
     <step>
@@ -39,24 +37,25 @@
       </commands>
       <explanation>
         For each new feature, create a dedicated branch from development.
-        This allows for clean pull requests to both your development branch and upstream.
+        This allows for clean pull requests to your development branch.
       </explanation>
     </step>
     <step>
       <id>4</id>
-      <title>Syncing with Upstream</title>
+      <title>Manual Syncing with Original Repository (If Needed)</title>
       <commands>
-        <command>git checkout main</command>
+        <command>git remote add upstream https://github.com/openhue/openhue-cli.git</command>
         <command>git fetch upstream</command>
+        <command>git checkout main</command>
         <command>git merge upstream/main</command>
         <command>git push origin main</command>
-        <command>git checkout development</command>
-        <command>git merge main</command>
-        <command>git push origin development</command>
+        <command>git remote remove upstream</command>
       </commands>
       <explanation>
-        Periodically sync your main branch with upstream, then merge those changes into development.
-        This keeps your fork up-to-date with the original repository.
+        If synchronization with the original repository becomes necessary:
+        1. Temporarily add the original repository as an upstream remote
+        2. Fetch and merge changes
+        3. Remove the upstream remote afterward to maintain isolation
       </explanation>
     </step>
   </steps>

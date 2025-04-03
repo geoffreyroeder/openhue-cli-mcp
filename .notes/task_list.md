@@ -1,6 +1,30 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <tasks>
   <task>
+    <id>1.4</id>
+    <title>Simplify repository configuration</title>
+    <status>completed</status>
+    <priority>high</priority>
+    <description>Remove upstream remote to avoid accidental interactions with original repository</description>
+    <subtasks>
+      <subtask>
+        <id>1.4.1</id>
+        <title>Remove upstream remote</title>
+        <status>completed</status>
+      </subtask>
+      <subtask>
+        <id>1.4.2</id>
+        <title>Update documentation</title>
+        <status>completed</status>
+      </subtask>
+      <subtask>
+        <id>1.4.3</id>
+        <title>Create plan for future syncing if needed</title>
+        <status>completed</status>
+      </subtask>
+    </subtasks>
+  </task>
+  <task>
     <id>1</id>
     <title>Switch to development on fork repository</title>
     <status>completed</status>
