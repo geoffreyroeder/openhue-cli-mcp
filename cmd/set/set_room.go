@@ -1,8 +1,9 @@
 package set
 
 import (
-	"github.com/spf13/cobra"
 	"openhue-cli/openhue"
+
+	"github.com/spf13/cobra"
 )
 
 const (
@@ -64,6 +65,10 @@ func NewCmdSetRoom(ctx *openhue.Context) *cobra.Command {
 			}
 
 			for _, room := range rooms {
+				if room.GroupedLight == nil {
+					ctx.Io.ErrPrintln("warning: room", room.Name, "does not have a valid GroupedLight, skipping...")
+					continue
+				}
 				room.GroupedLight.Set(o)
 			}
 		},
