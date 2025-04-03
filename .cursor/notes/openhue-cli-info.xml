@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<openhue-cli>
+    <overview>
+        <name>OpenHue CLI</name>
+        <description>Command-line interface for interacting with Philips Hue smart lighting systems</description>
+        <license>Apache License 2.0</license>
+        <language>Go</language>
+        <version>1.22.3</version>
+    </overview>
+
+    <architecture>
+        <core_components>
+            <component name="Context">
+                <description>Central context object containing configuration, home model, and IO streams</description>
+                <dependencies>
+                    <dependency>IOStreams</dependency>
+                    <dependency>BuildInfo</dependency>
+                    <dependency>HomeModel</dependency>
+                    <dependency>Config</dependency>
+                </dependencies>
+            </component>
+            <component name="HomeModel">
+                <description>Data model representing the Hue bridge state and resources</description>
+                <dependencies>
+                    <dependency>Resource</dependency>
+                    <dependency>Room</dependency>
+                    <dependency>Device</dependency>
+                    <dependency>Light</dependency>
+                </dependencies>
+            </component>
+            <component name="Resource">
+                <description>Base type for all Hue resources with common properties</description>
+                <properties>
+                    <property>Id</property>
+                    <property>Name</property>
+                    <property>Type</property>
+                    <property>Parent</property>
+                </properties>
+            </component>
+        </core_components>
+
+        <command_structure>
+            <command_group name="get">
+                <commands>
+                    <command>lights</command>
+                    <command>rooms</command>
+                    <command>scenes</command>
+                </commands>
+            </command_group>
+            <command_group name="set">
+                <commands>
+                    <command>lights</command>
+                    <command>rooms</command>
+                    <command>scenes</command>
+                </commands>
+            </command_group>
+            <command_group name="setup">
+                <commands>
+                    <command>discover</command>
+                    <command>configure</command>
+                </commands>
+            </command_group>
+        </command_structure>
+    </architecture>
+
+    <key_interfaces>
+        <interface name="LightService">
+            <methods>
+                <method>IsOn() bool</method>
+                <method>Set(options SetLightOptions)</method>
+            </methods>
+        </interface>
+        <interface name="SceneService">
+            <methods>
+                <method>Activate()</method>
+            </methods>
+        </interface>
+    </key_interfaces>
+
+    <dependencies>
+        <dependency name="openhue-go">v0.3.0</dependency>
+        <dependency name="cobra">v1.9.1</dependency>
+        <dependency name="logrus">v1.9.3</dependency>
+        <dependency name="viper">v1.20.1</dependency>
+    </dependencies>
+</openhue-cli> 
