@@ -3,24 +3,24 @@
   <task>
     <id>1</id>
     <title>Switch to development on fork repository</title>
-    <status>in_progress</status>
+    <status>completed</status>
     <priority>high</priority>
     <description>Configure local environment to work with the forked repository</description>
     <subtasks>
       <subtask>
         <id>1.1</id>
         <title>Update remote URL to point to fork</title>
-        <status>pending</status>
+        <status>completed</status>
       </subtask>
       <subtask>
         <id>1.2</id>
         <title>Create development branch</title>
-        <status>pending</status>
+        <status>completed</status>
       </subtask>
       <subtask>
         <id>1.3</id>
         <title>Set up upstream tracking</title>
-        <status>pending</status>
+        <status>completed</status>
       </subtask>
     </subtasks>
   </task>
