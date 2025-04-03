@@ -13,7 +13,7 @@
             }
         ],
         "project_directives": {
-            "name": "malareparam"
+            "name": "openhue-cli"
         },
         "context_management": {
             "description": "Instructions for maintaining important context",
@@ -107,12 +107,14 @@
             }
         },
         "technical_guidelines": {
-            "jax": {
-                "description": "Consolidated JAX programming rules",
+            "go": {
+                "description": "Consolidated Go programming rules",
                 "rules": [
-                    "Never use dynamic Python slicing (arr[start:stop]) where start/stop depend on non-static function inputs",
-                    "Use vmap instead of manually writing out loops",
-                    "Ensure you're using the latest version of JAX"
+                    "Follow Go idioms and standard library patterns",
+                    "Ensure proper error handling with descriptive messages",
+                    "Use Go modules for dependency management",
+                    "Write tests for all new functionality",
+                    "Follow Go naming conventions (camelCase for unexported, PascalCase for exported)"
                 ]
             },
             "code_quality": {
@@ -120,7 +122,8 @@
                 "rules": [
                     "Write self-documenting code with clear variable names",
                     "Include meaningful docstrings for all functions",
-                    "Group related functionality"
+                    "Group related functionality",
+                    "Follow the existing project structure with cmd/, openhue/, and util/ directories"
                 ]
             }
         },
@@ -157,6 +160,16 @@
                 "When creating task hierarchies, ensure parent tasks accurately reflect the status of all subtasks",
                 "Regularly review task list to ensure consistency between parent and subtask completion status",
                 "When updating task status, always check parent-child relationships"
+            ]
+        },
+        "project_specific": {
+            "description": "Guidelines specific to OpenHue CLI project",
+            "rules": [
+                "Understand the Philips Hue API documentation before making changes",
+                "Consider backward compatibility when modifying existing commands",
+                "Follow the command pattern established in cmd/ directory",
+                "Update README.md when adding new commands or features",
+                "Consider cross-platform compatibility (Windows, macOS, Linux)"
             ]
         }
     }
