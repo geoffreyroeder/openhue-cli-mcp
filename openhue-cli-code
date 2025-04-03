@@ -1,0 +1,5363 @@
+This file is a merged representation of a subset of the codebase, containing files not matching ignore patterns, combined into a single document by Repomix.
+The content has been processed where content has been compressed (code blocks are separated by ⋮---- delimiter).
+
+================================================================
+File Summary
+================================================================
+
+Purpose:
+--------
+This file contains a packed representation of the entire repository's contents.
+It is designed to be easily consumable by AI systems for analysis, code review,
+or other automated processes.
+
+File Format:
+------------
+The content is organized as follows:
+1. This summary section
+2. Repository information
+3. Directory structure
+4. Multiple file entries, each consisting of:
+  a. A separator line (================)
+  b. The file path (File: path/to/file)
+  c. Another separator line
+  d. The full contents of the file
+  e. A blank line
+
+Usage Guidelines:
+-----------------
+- This file should be treated as read-only. Any changes should be made to the
+  original repository files, not this packed version.
+- When processing this file, use the file path to distinguish
+  between different files in the repository.
+- Be aware that this file may contain sensitive information. Handle it with
+  the same level of security as you would the original repository.
+
+Notes:
+------
+- Some files may have been excluded based on .gitignore rules and Repomix's configuration
+- Binary files are not included in this packed representation. Please refer to the Repository Structure section for a complete list of file paths, including binary files
+- Files matching these patterns are excluded: dist
+- Files matching patterns in .gitignore are excluded
+- Files matching default ignore patterns are excluded
+- Content has been compressed - code blocks are separated by ⋮---- delimiter
+- Files are sorted by Git change count (files with more changes are at the bottom)
+
+Additional Info:
+----------------
+
+================================================================
+Directory Structure
+================================================================
+.cursor/
+  diagrams/
+    openhue-cli-diagrams.md
+  notes/
+    openhue-cli-dev-guide.xml
+    openhue-cli-info.xml
+    openhue-cli-repomix.xml
+.github/
+  workflows/
+    build.yml
+    release.yml
+  dependabot.yml
+cmd/
+  get/
+    get_events.go
+    get_light.go
+    get_room.go
+    get_scene_test.go
+    get_scene.go
+    get.go
+  set/
+    common.go
+    set_light.go
+    set_room.go
+    set_scene.go
+    set.go
+  setup/
+    config_test.go
+    config.go
+    discover_test.go
+    discover.go
+    doc.go
+    setup_test.go
+    setup.go
+  version/
+    version_test.go
+    version.go
+  root.go
+openhue/
+  test/
+    assert/
+      assert.go
+    utils.go
+  buildinfo_test.go
+  buildinfo.go
+  config.go
+  context_test.go
+  context.go
+  home_context.go
+  home_model.go
+  home_service_test.go
+  home_service.go
+  io_test.go
+  io.go
+util/
+  color/
+    color_test.go
+    color.go
+    constant_test.go
+    constant.go
+    conversion_test.go
+    conversion.go
+  logger/
+    logger.go
+  metrics_test.go
+  metrics.go
+  utils_test.go
+  utils.go
+.codeclimate.yml
+.gitignore
+.goreleaser.yaml
+Dockerfile
+go.mod
+LICENSE
+main.go
+Makefile
+README.md
+register_hue.sh
+
+================================================================
+Files
+================================================================
+
+================
+File: .cursor/notes/openhue-cli-dev-guide.xml
+================
+<?xml version="1.0" encoding="UTF-8"?>
+<openhue-cli-dev-guide>
+    <code_patterns>
+        <pattern name="add_command">
+            <description>Standard pattern for adding a new command to the CLI</description>
+            <steps>
+                <step>Create a new file in the appropriate cmd/{category} directory</step>
+                <step>Implement a New{Command} function that returns a cobra.Command</step>
+                <step>Define command documentation constants</step>
+                <step>Add command options struct if needed</step>
+                <step>Add the command to the parent command in its NewCmd{Parent} function</step>
+            </steps>
+            <example>
+                <![CDATA[
+// in cmd/get/get_new_resource.go
+package get
+
+import (
+    "github.com/spf13/cobra"
+    "openhue-cli/openhue"
+    "openhue-cli/util"
+)
+
+const (
+    docShortGetNewResource = "Get new resource"
+    docLongGetNewResource  = `
+Fetches and displays all available new resources
+`
+    docExampleGetNewResource = `
+# List all new resources
+openhue get newresource
+`
+)
+
+type NewResourceOptions struct {
+    *CmdGetOptions
+    Filter string
+}
+
+// NewCmdGetNewResource returns initialized Command instance for the 'get newresource' command
+func NewCmdGetNewResource(ctx *openhue.Context, co *CmdGetOptions) *cobra.Command {
+    o := NewResourceOptions{
+        CmdGetOptions: co,
+    }
+    
+    cmd := &cobra.Command{
+        Use:     "newresource [id]",
+        Aliases: []string{"newresources"},
+        Short:   docShortGetNewResource,
+        Long:    docLongGetNewResource,
+        Example: docExampleGetNewResource,
+        Args:    cobra.RangeArgs(0, 1),
+        Run: func(cmd *cobra.Command, args []string) {
+            o.RunGetNewResourceCmd(ctx, args)
+        },
+    }
+    
+    cmd.Flags().StringVarP(&o.Filter, "filter", "f", "", "Filter resources by property")
+    
+    return cmd
+}
+
+func (o *NewResourceOptions) RunGetNewResourceCmd(ctx *openhue.Context, args []string) {
+    // Implementation
+}
+
+// Then in cmd/get/get.go, add:
+// root.AddCommand(NewCmdGetNewResource(ctx, o))
+                ]]>
+            </example>
+        </pattern>
+        
+        <pattern name="error_handling">
+            <description>Standard error handling pattern</description>
+            <example>
+                <![CDATA[
+// Use cobra.CheckErr for command-level errors
+err := doSomething()
+cobra.CheckErr(err)
+
+// Use log.Warning for non-critical errors
+if err != nil {
+    log.Warning(err)
+}
+
+// Return errors from functions to be handled upstream
+func myFunction() (*Result, error) {
+    data, err := fetchData()
+    if err != nil {
+        return nil, fmt.Errorf("failed to fetch data: %w", err)
+    }
+    return data, nil
+}
+                ]]>
+            </example>
+        </pattern>
+        
+        <pattern name="model_implementation">
+            <description>Pattern for implementing a new model type</description>
+            <example>
+                <![CDATA[
+// In openhue/home_model.go, add:
+type NewResource struct {
+    Resource
+    HueData *openhue.NewResourceGet
+    // Additional fields
+}
+
+func (resource *NewResource) IsAvailable() bool {
+    return resource.HueData.Status.Available
+}
+
+// In openhue/home_service.go, add:
+func SearchNewResources(home *HomeModel, filters []string) []NewResource {
+    var resources []NewResource
+    
+    // Implementation
+    
+    return resources
+}
+
+// Add to HomeModel loading in LoadHome function
+                ]]>
+            </example>
+        </pattern>
+    </code_patterns>
+    
+    <file_structure>
+        <component name="commands">
+            <file path="cmd/root.go">Root command definition and registration of all subcommands</file>
+            <file path="cmd/get/get.go">Registration of all "get" commands</file>
+            <file path="cmd/set/set.go">Registration of all "set" commands</file>
+            <file path="cmd/setup/setup.go">Setup/configuration commands</file>
+        </component>
+        
+        <component name="models">
+            <file path="openhue/home_model.go">Core data structures for Hue resources</file>
+            <file path="openhue/home_service.go">Service methods for searching/managing resources</file>
+            <file path="openhue/home_context.go">Internal context for Hue API data</file>
+        </component>
+        
+        <component name="core">
+            <file path="openhue/context.go">Application context definition</file>
+            <file path="openhue/config.go">Configuration loading/saving</file>
+            <file path="openhue/io.go">IO stream handling</file>
+        </component>
+        
+        <component name="utilities">
+            <file path="util/color/color.go">Color handling utilities</file>
+            <file path="util/utils.go">General utilities for output formatting</file>
+            <file path="util/logger/logger.go">Logging configuration</file>
+        </component>
+    </file_structure>
+    
+    <configuration>
+        <standard_locations>
+            <location name="config_file" value="$HOME/.openhue/config.yaml">Main configuration file</location>
+        </standard_locations>
+        
+        <config_structure>
+            <property name="Bridge">IP address of the Philips HUE Bridge</property>
+            <property name="Key">The HUE Application Key</property>
+        </config_structure>
+        
+        <example>
+            <![CDATA[
+// Reading config
+func (c *Config) Load() {
+    if err := viper.ReadInConfig(); err != nil {
+        // Handle error
+    }
+    
+    c.Bridge = viper.GetString("bridge")
+    c.Key = viper.GetString("key")
+}
+
+// Saving config
+func (c *Config) Save() (string, error) {
+    viper.Set("bridge", c.Bridge)
+    viper.Set("key", c.Key)
+    
+    return viper.ConfigFileUsed(), viper.WriteConfig()
+}
+            ]]>
+        </example>
+    </configuration>
+    
+    <testing>
+        <pattern name="command_testing">
+            <description>Pattern for testing commands</description>
+            <example>
+                <![CDATA[
+func TestNewCmdGetResource(t *testing.T) {
+    ctx, out := openhue.NewTestContext(nil)
+    cmd := NewCmdGetResource(ctx, &CmdGetOptions{})
+    
+    assert.ThatCmdUseIs(t, cmd, "resource [id]")
+    assert.NotNil(t, cmd.Run)
+}
+                ]]>
+            </example>
+        </pattern>
+        
+        <pattern name="model_testing">
+            <description>Pattern for testing models</description>
+            <example>
+                <![CDATA[
+func TestSearchResources(t *testing.T) {
+    home := mockHome()
+    resources := SearchResources(home, []string{})
+    
+    assert.NotNil(t, resources)
+    assert.Len(t, resources, 2)
+}
+
+func mockHome() *HomeModel {
+    // Create a mock home model for testing
+}
+                ]]>
+            </example>
+        </pattern>
+        
+        <mocking>
+            <description>Common patterns for creating test mocks</description>
+            <example>
+                <![CDATA[
+// Creating a test HomeModel
+func NewFakeHome() *openhue.HomeModel {
+    return &openhue.HomeModel{
+        Resource: openhue.Resource{
+            Id:   "test-home",
+            Name: "Test Home",
+            Type: openhue.HomeResourceType("bridge_home"),
+        },
+        Rooms: []openhue.Room{
+            // Mock rooms
+        },
+    }
+}
+                ]]>
+            </example>
+        </mocking>
+    </testing>
+    
+    <common_tasks>
+        <task name="add_command">
+            <description>Steps to add a new command</description>
+            <steps>
+                <step>Create a new file in the appropriate cmd/ directory</step>
+                <step>Implement the command structure following existing patterns</step>
+                <step>Add the command to the parent command registration</step>
+                <step>Write tests for the command</step>
+            </steps>
+        </task>
+        
+        <task name="add_resource_type">
+            <description>Steps to add a new resource type</description>
+            <steps>
+                <step>Add the new type to openhue/home_model.go</step>
+                <step>Add search functions to openhue/home_service.go</step>
+                <step>Update the HomeModel loading in LoadHome function</step>
+                <step>Add commands to interact with the resource</step>
+            </steps>
+        </task>
+        
+        <task name="modify_config">
+            <description>Steps to modify configuration</description>
+            <steps>
+                <step>Update the Config struct in openhue/config.go</step>
+                <step>Update the Load and Save methods</step>
+                <step>Update command flags that use the configuration</step>
+            </steps>
+        </task>
+    </common_tasks>
+</openhue-cli-dev-guide>
+
+================
+File: register_hue.sh
+================
+#!/bin/bash
+
+# Script to register with Philips Hue Bridge
+# This script waits 30 seconds after you press the link button on your Hue Bridge
+# then sends the registration request
+
+# Set your Hue Bridge IP address here
+HUE_BRIDGE_IP="192.168.1.151"
+
+# Set your desired app name here
+APP_NAME="openhue"
+
+echo "Press the link button on your Hue Bridge now!"
+echo "Waiting 30 seconds..."
+
+# Countdown timer
+for i in {30..1}
+do
+   echo -ne "$i seconds remaining...\r"
+   sleep 1
+done
+
+echo -e "\nSending registration request to Hue Bridge at $HUE_BRIDGE_IP..."
+
+# Make the POST request using curl
+response=$(curl -s -X POST "http://$HUE_BRIDGE_IP/api" \
+  -H "Content-Type: application/json" \
+  -d "{\"devicetype\":\"$APP_NAME\"}")
+
+echo "Response from Hue Bridge:"
+echo $response | python -m json.tool
+
+# Check if successful and extract username
+if [[ $response == *"success"* ]]; then
+  username=$(echo $response | grep -o '"username":"[^"]*' | grep -o '[^"]*$')
+  echo ""
+  echo "SUCCESS! Your Hue application key is:"
+  echo "$username"
+  echo ""
+  echo "Save this key for future use with your Hue Bridge."
+else
+  echo ""
+  echo "ERROR: Failed to register with Hue Bridge."
+  echo "Make sure you pressed the link button and the Bridge IP is correct."
+fi
+
+================
+File: .cursor/diagrams/openhue-cli-diagrams.md
+================
+# OpenHue CLI Architecture Diagrams
+
+## Core Components UML
+
+```mermaid
+classDiagram
+    class Context {
+        +IOStreams Io
+        +BuildInfo BuildInfo
+        +Home Home
+        +Config Config
+    }
+    
+    class HomeModel {
+        +Resource Resource
+        +[]Room Rooms
+        +[]Device Devices
+        +BridgeHomeGet HueData
+    }
+    
+    class Resource {
+        +string Id
+        +string Name
+        +HomeResourceType Type
+        +Resource Parent
+    }
+    
+    class Room {
+        +Resource Resource
+        +[]Device Devices
+        +[]Scene Scenes
+        +GroupedLight GroupedLight
+    }
+    
+    class Device {
+        +Resource Resource
+        +Light Light
+    }
+    
+    class Light {
+        +Resource Resource
+        +LightService LightService
+        +LightGet HueData
+    }
+    
+    Context --> HomeModel
+    HomeModel --> Resource
+    Room --> Resource
+    Device --> Resource
+    Light --> Resource
+```
+
+## Command Flow
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant CLI
+    participant Context
+    participant HomeModel
+    participant Bridge
+    
+    User->>CLI: Executes command
+    CLI->>Context: Loads configuration
+    Context->>Bridge: Authenticates
+    Bridge-->>Context: Returns home data
+    Context->>HomeModel: Creates model
+    HomeModel-->>CLI: Returns structured data
+    CLI->>User: Displays results
+```
+
+## Data Flow
+
+```mermaid
+graph TD
+    A[User Command] --> B[CLI Parser]
+    B --> C[Command Handler]
+    C --> D[Context Loader]
+    D --> E[Bridge API]
+    E --> F[HomeModel Builder]
+    F --> G[Resource Processor]
+    G --> H[Response Formatter]
+    H --> I[User Output]
+```
+
+## Configuration Flow
+
+```mermaid
+graph LR
+    A[Setup Command] --> B[Bridge Discovery]
+    B --> C[User Authentication]
+    C --> D[Config Save]
+    D --> E[Config Load]
+    E --> F[API Client Creation]
+```
+
+## Error Handling Flow
+
+```mermaid
+graph TD
+    A[Command Execution] --> B{Error?}
+    B -->|Yes| C[Error Handler]
+    B -->|No| D[Success Path]
+    C --> E[Error Formatter]
+    E --> F[User Output]
+```
+
+## Project Structure
+
+```mermaid
+graph TD
+    A[openhue-cli] --> B[cmd]
+    A --> C[openhue]
+    A --> D[util]
+    
+    B --> B1[get]
+    B --> B2[set]
+    B --> B3[setup]
+    B --> B4[version]
+    
+    C --> C1[gen]
+    C --> C2[test]
+    
+    D --> D1[color]
+    D --> D2[logger]
+    D --> D3[metrics]
+```
+
+## Room Discovery and Light Control Flow
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant CLI
+    participant Context
+    participant HomeModel
+    participant Bridge
+    
+    %% Discover Rooms Flow
+    User->>CLI: openhue get room
+    CLI->>Context: LoadHomeIfNeeded()
+    Context->>Bridge: GetBridgeHome()
+    Bridge-->>Context: Returns bridge home data
+    Context->>Bridge: GetRooms()
+    Bridge-->>Context: Returns rooms data
+    Context->>Bridge: GetDevices(), GetLights(), etc.
+    Bridge-->>Context: Returns additional data
+    Context->>HomeModel: LoadHome()
+    HomeModel->>HomeModel: getRooms()
+    HomeModel->>HomeModel: getDevices()
+    HomeModel-->>Context: Populated HomeModel
+    Context->>CLI: SearchRooms()
+    CLI->>User: Display room list
+    
+    %% Turn Off Lights in Room
+    User->>CLI: openhue set room "Living Room" --off
+    CLI->>Context: LoadHomeIfNeeded()
+    Note over Context,HomeModel: Home already loaded
+    Context->>HomeModel: SearchRooms("Living Room")
+    HomeModel-->>CLI: Room with GroupedLight
+    CLI->>HomeModel: room.GroupedLight.Set(LightStatusOff)
+    HomeModel->>Bridge: UpdateGroupedLight(id, {on: false})
+    Bridge-->>HomeModel: Success response
+    HomeModel-->>CLI: Success
+    CLI->>User: Command completed
+```
+
+## CLI Interface Examples
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant CLI
+    
+    %% Discover Rooms Flow with Output
+    User->>CLI: $ openhue get room
+    Note over CLI: Processing Command
+    CLI-->>User: ID                                      Name          Type   Status  Brightness<br>aa31ba26-98a7-4830-8ae9-1b7caa8b5700  Living Room   living_room  [on]   85%<br>7d7c9405-bcc0-4f94-9c1a-d2e5c39e59ad  Kitchen      kitchen     [  ]   N/A<br>3b87f749-96e1-4906-a372-30c21e7f36c5  Bedroom      bedroom     [on]   60%
+    
+    %% Get Room Details with Output
+    User->>CLI: $ openhue get room "Living Room" --json
+    Note over CLI: Processing Command
+    CLI-->>User: {<br>  "Id": "aa31ba26-98a7-4830-8ae9-1b7caa8b5700",<br>  "Name": "Living Room",<br>  "Type": "room",<br>  "Devices": [<br>    { "Id": "15f51223-1e83-4e48-9158-0c20dbd5734e", "Name": "Hue Play Left" },<br>    { "Id": "83111103-a3eb-40c5-b22a-02deedd21fcb", "Name": "Hue Play Right" }<br>  ],<br>  "GroupedLight": {<br>    "Id": "afc61613-7b89-4633-a3f5-8ac94eca31ab",<br>    "Status": "on",<br>    "Brightness": 85<br>  }<br>}
+    
+    %% Turn Off Room Lights
+    User->>CLI: $ openhue set room "Living Room" --off
+    Note over CLI: Processing Command
+    CLI-->>User: Command completed successfully
+    
+    %% Error Case - Room Not Found
+    User->>CLI: $ openhue set room "Non-existent Room" --off
+    Note over CLI: Processing Command
+    CLI-->>User: Error: no room(s) found for given ID(s) [Non-existent Room]
+```
+
+================
+File: .cursor/notes/openhue-cli-info.xml
+================
+<?xml version="1.0" encoding="UTF-8"?>
+<openhue-cli>
+    <overview>
+        <name>OpenHue CLI</name>
+        <description>Command-line interface for interacting with Philips Hue smart lighting systems</description>
+        <license>Apache License 2.0</license>
+        <language>Go</language>
+        <version>1.22.3</version>
+    </overview>
+
+    <architecture>
+        <core_components>
+            <component name="Context">
+                <description>Central context object containing configuration, home model, and IO streams</description>
+                <dependencies>
+                    <dependency>IOStreams</dependency>
+                    <dependency>BuildInfo</dependency>
+                    <dependency>HomeModel</dependency>
+                    <dependency>Config</dependency>
+                </dependencies>
+            </component>
+            <component name="HomeModel">
+                <description>Data model representing the Hue bridge state and resources</description>
+                <dependencies>
+                    <dependency>Resource</dependency>
+                    <dependency>Room</dependency>
+                    <dependency>Device</dependency>
+                    <dependency>Light</dependency>
+                </dependencies>
+            </component>
+            <component name="Resource">
+                <description>Base type for all Hue resources with common properties</description>
+                <properties>
+                    <property>Id</property>
+                    <property>Name</property>
+                    <property>Type</property>
+                    <property>Parent</property>
+                </properties>
+            </component>
+        </core_components>
+
+        <command_structure>
+            <command_group name="get">
+                <commands>
+                    <command>lights</command>
+                    <command>rooms</command>
+                    <command>scenes</command>
+                </commands>
+            </command_group>
+            <command_group name="set">
+                <commands>
+                    <command>lights</command>
+                    <command>rooms</command>
+                    <command>scenes</command>
+                </commands>
+            </command_group>
+            <command_group name="setup">
+                <commands>
+                    <command>discover</command>
+                    <command>configure</command>
+                </commands>
+            </command_group>
+        </command_structure>
+    </architecture>
+
+    <key_interfaces>
+        <interface name="LightService">
+            <methods>
+                <method>IsOn() bool</method>
+                <method>Set(options SetLightOptions)</method>
+            </methods>
+        </interface>
+        <interface name="SceneService">
+            <methods>
+                <method>Activate()</method>
+            </methods>
+        </interface>
+    </key_interfaces>
+
+    <dependencies>
+        <dependency name="openhue-go">v0.3.0</dependency>
+        <dependency name="cobra">v1.9.1</dependency>
+        <dependency name="logrus">v1.9.3</dependency>
+        <dependency name="viper">v1.20.1</dependency>
+    </dependencies>
+</openhue-cli>
+
+================
+File: .cursor/notes/openhue-cli-repomix.xml
+================
+This file is a merged representation of the entire codebase, combined into a single document by Repomix.
+The content has been processed where content has been compressed (code blocks are separated by ⋮---- delimiter).
+
+<file_summary>
+This section contains a summary of this file.
+
+<purpose>
+This file contains a packed representation of the entire repository's contents.
+It is designed to be easily consumable by AI systems for analysis, code review,
+or other automated processes.
+</purpose>
+
+<file_format>
+The content is organized as follows:
+1. This summary section
+2. Repository information
+3. Directory structure
+4. Repository files, each consisting of:
+  - File path as an attribute
+  - Full contents of the file
+</file_format>
+
+<usage_guidelines>
+- This file should be treated as read-only. Any changes should be made to the
+  original repository files, not this packed version.
+- When processing this file, use the file path to distinguish
+  between different files in the repository.
+- Be aware that this file may contain sensitive information. Handle it with
+  the same level of security as you would the original repository.
+</usage_guidelines>
+
+<notes>
+- Some files may have been excluded based on .gitignore rules and Repomix's configuration
+- Binary files are not included in this packed representation. Please refer to the Repository Structure section for a complete list of file paths, including binary files
+- Files matching patterns in .gitignore are excluded
+- Files matching default ignore patterns are excluded
+- Content has been compressed - code blocks are separated by ⋮---- delimiter
+- Files are sorted by Git change count (files with more changes are at the bottom)
+</notes>
+
+<additional_info>
+
+</additional_info>
+
+</file_summary>
+
+<directory_structure>
+.github/
+  workflows/
+    build.yml
+    release.yml
+  dependabot.yml
+cmd/
+  get/
+    get_events.go
+    get_light.go
+    get_room.go
+    get_scene_test.go
+    get_scene.go
+    get.go
+  set/
+    common.go
+    set_light.go
+    set_room.go
+    set_scene.go
+    set.go
+  setup/
+    config_test.go
+    config.go
+    discover_test.go
+    discover.go
+    doc.go
+    setup_test.go
+    setup.go
+  version/
+    version_test.go
+    version.go
+  root.go
+openhue/
+  test/
+    assert/
+      assert.go
+    utils.go
+  buildinfo_test.go
+  buildinfo.go
+  config.go
+  context_test.go
+  context.go
+  home_context.go
+  home_model.go
+  home_service_test.go
+  home_service.go
+  io_test.go
+  io.go
+util/
+  color/
+    color_test.go
+    color.go
+    constant_test.go
+    constant.go
+    conversion_test.go
+    conversion.go
+  logger/
+    logger.go
+  metrics_test.go
+  metrics.go
+  utils_test.go
+  utils.go
+.codeclimate.yml
+.gitignore
+.goreleaser.yaml
+Dockerfile
+go.mod
+LICENSE
+main.go
+Makefile
+README.md
+</directory_structure>
+
+<files>
+This section contains the contents of the repository's files.
+
+<file path=".github/dependabot.yml">
+version: 2
+updates:
+  - package-ecosystem: gomod
+    directory: /
+    schedule:
+      interval: daily
+</file>
+
+<file path="cmd/get/get_events.go">
+package get
+⋮----
+import (
+	"crypto/tls"
+	"encoding/json"
+	"github.com/r3labs/sse/v2"
+	log "github.com/sirupsen/logrus"
+	"github.com/spf13/cobra"
+	"net/http"
+	"openhue-cli/openhue"
+	"openhue-cli/util"
+)
+⋮----
+"crypto/tls"
+"encoding/json"
+"github.com/r3labs/sse/v2"
+log "github.com/sirupsen/logrus"
+"github.com/spf13/cobra"
+"net/http"
+"openhue-cli/openhue"
+"openhue-cli/util"
+⋮----
+type HueEvent struct {
+	Id     string                   `json:"id"`
+	Events []map[string]interface{} `json:"events"`
+⋮----
+func NewCmdGetEvents(ctx *openhue.Context, c *CmdGetOptions) *cobra.Command
+⋮----
+func onEvent(ctx *openhue.Context) func(msg *sse.Event)
+⋮----
+//id := string(msg.ID)
+⋮----
+// createSseClient creates a fully initialized sse.Client to retrieve bridge events
+func createSseClient(ctx *openhue.Context) *sse.Client
+</file>
+
+<file path="cmd/setup/discover_test.go">
+package setup
+⋮----
+import (
+	"openhue-cli/openhue"
+	"openhue-cli/openhue/test/assert"
+	"testing"
+)
+⋮----
+"openhue-cli/openhue"
+"openhue-cli/openhue/test/assert"
+"testing"
+⋮----
+func TestNewCmdDiscover(t *testing.T)
+</file>
+
+<file path="cmd/setup/doc.go">
+// Package setup contains the commands that are used to configure and initialize the OpenHue CLI context
+package setup
+</file>
+
+<file path="cmd/setup/setup_test.go">
+package setup
+⋮----
+import (
+	"openhue-cli/openhue"
+	"openhue-cli/openhue/test/assert"
+	"testing"
+)
+⋮----
+"openhue-cli/openhue"
+"openhue-cli/openhue/test/assert"
+"testing"
+⋮----
+func TestNewCmdSetup(t *testing.T)
+</file>
+
+<file path="openhue/test/utils.go">
+package test
+⋮----
+import (
+	"math"
+)
+⋮----
+"math"
+⋮----
+// AlmostEqual32 returns true if a and b are equal within a relative error of e.
+// See http://floating-point-gui.de/errors/comparison/ for the details of the applied method.
+func AlmostEqual32(a, b, e float32) bool
+⋮----
+// Abs32 works like math.Abs, but for float32.
+func Abs32(x float32) float32
+⋮----
+return 0 // return correctly abs(-0)
+⋮----
+// Min32 works like math.Min, but for float32.
+func Min32(x, y float32) float32
+</file>
+
+<file path="openhue/buildinfo.go">
+package openhue
+⋮----
+type BuildInfo struct {
+	Version string
+	Commit  string
+	Date    string
+}
+⋮----
+// NewBuildInfo creates a new BuildInfo container
+func NewBuildInfo(version string, commit string, date string) *BuildInfo
+⋮----
+// NewTestBuildInfo returns a valid openhue.BuildInfo just for testing
+func NewTestBuildInfo() *BuildInfo
+</file>
+
+<file path="openhue/io_test.go">
+package openhue
+⋮----
+import (
+	"io"
+	"os"
+	"testing"
+)
+⋮----
+"io"
+"os"
+"testing"
+⋮----
+func TestNewIOSteams(t *testing.T)
+⋮----
+func TestNewTestIOStreams(t *testing.T)
+⋮----
+func TestNewTestIOStreamsDiscard(t *testing.T)
+</file>
+
+<file path="util/color/color.go">
+package color
+⋮----
+type RGB struct {
+	Red   int
+	Green int
+	Blue  int
+}
+⋮----
+type XY struct {
+	X          float32
+	Y          float32
+	Brightness float32
+}
+⋮----
+var UndefinedColor = XY{
+	X:          -1.0,
+	Y:          -1.0,
+	Brightness: -1.0,
+}
+⋮----
+// RGBHex Hexadecimal representation of an RGB color. Must start with '#'
+type RGBHex string
+⋮----
+// toXY converts a RGBHex value to its XY representation in CIE color space
+func (c *RGBHex) toXY() *XY
+</file>
+
+<file path="util/color/constant.go">
+package color
+⋮----
+import (
+	"fmt"
+	"strings"
+)
+⋮----
+"fmt"
+"strings"
+⋮----
+// The Table contains the list of supported colors by name
+var Table = map[RGBHex]*XY{
+	// basic colors
+	"white":   rgb("#FFFFFF").toXY(),
+	"red":     rgb("#FF0000").toXY(),
+	"lime":    rgb("#00FF00").toXY(),
+	"blue":    rgb("#0000FF").toXY(),
+	"yellow":  rgb("#FFFF00").toXY(),
+	"cyan":    rgb("#00FFFF").toXY(),
+	"aqua":    rgb("#00FFFF").toXY(),
+	"magenta": rgb("#FF00FF").toXY(),
+	"fuchsia": rgb("#FF00FF").toXY(),
+	"silver":  rgb("#C0C0C0").toXY(),
+	"gray":    rgb("#FF00FF").toXY(),
+	"maroon":  rgb("#808080").toXY(),
+	"olive":   rgb("#808000").toXY(),
+	"green":   rgb("#008000").toXY(),
+	"purple":  rgb("#800080").toXY(),
+	"teal":    rgb("#008080").toXY(),
+	"navy":    rgb("#000080").toXY(),
+
+	// more colors
+	"dark_red":                rgb("#8B0000").toXY(),
+	"brown":                   rgb("#A52A2A").toXY(),
+	"firebrick":               rgb("#B22222").toXY(),
+	"crimson":                 rgb("#DC143C").toXY(),
+	"tomato":                  rgb("#FF6347").toXY(),
+	"coral":                   rgb("#FF7F50").toXY(),
+	"indian_red":              rgb("#CD5C5C").toXY(),
+	"light_coral":             rgb("#F08080").toXY(),
+	"dark_salmon":             rgb("#E9967A").toXY(),
+	"salmon":                  rgb("#FA8072").toXY(),
+	"light_salmon":            rgb("#FFA07A").toXY(),
+	"orange_red":              rgb("#FF4500").toXY(),
+	"dark_orange":             rgb("#FF8C00").toXY(),
+	"orange":                  rgb("#FFA500").toXY(),
+	"gold":                    rgb("#FFD700").toXY(),
+	"dark_golden_rod":         rgb("#B8860B").toXY(),
+	"golden_rod":              rgb("#DAA520").toXY(),
+	"pale_golden_rod":         rgb("#EEE8AA").toXY(),
+	"dark_khaki":              rgb("#BDB76B").toXY(),
+	"khaki":                   rgb("#F0E68C").toXY(),
+	"yellow_green":            rgb("#9ACD32").toXY(),
+	"dark_olive_green":        rgb("#556B2F").toXY(),
+	"olive_drab":              rgb("#6B8E23").toXY(),
+	"lawn_green":              rgb("#7CFC00").toXY(),
+	"chartreuse":              rgb("#7FFF00").toXY(),
+	"green_yellow":            rgb("#ADFF2F").toXY(),
+	"dark_green":              rgb("#006400").toXY(),
+	"forest_green":            rgb("#228B22").toXY(),
+	"lime_green":              rgb("#32CD32").toXY(),
+	"light_green":             rgb("#90EE90").toXY(),
+	"pale_green":              rgb("#98FB98").toXY(),
+	"dark_sea_green":          rgb("#8FBC8F").toXY(),
+	"medium_spring_green":     rgb("#00FA9A").toXY(),
+	"spring_green":            rgb("#00FF7F").toXY(),
+	"sea_green":               rgb("#2E8B57").toXY(),
+	"medium_aqua_marine":      rgb("#66CDAA").toXY(),
+	"medium_sea_green":        rgb("#3CB371").toXY(),
+	"light_sea_green":         rgb("#20B2AA").toXY(),
+	"dark_slate_gray":         rgb("#2F4F4F").toXY(),
+	"dark_cyan":               rgb("#008B8B").toXY(),
+	"light_cyan":              rgb("#E0FFFF").toXY(),
+	"dark_turquoise":          rgb("#00CED1").toXY(),
+	"turquoise":               rgb("#40E0D0").toXY(),
+	"medium_turquoise":        rgb("#48D1CC").toXY(),
+	"pale_turquoise":          rgb("#AFEEEE").toXY(),
+	"aqua_marine":             rgb("#7FFFD4").toXY(),
+	"powder_blue":             rgb("#B0E0E6").toXY(),
+	"cadet_blue":              rgb("#5F9EA0").toXY(),
+	"steel_blue":              rgb("#4682B4").toXY(),
+	"corn_flower_blue":        rgb("#6495ED").toXY(),
+	"deep_sky_blue":           rgb("#00BFFF").toXY(),
+	"dodger_blue":             rgb("#1E90FF").toXY(),
+	"light_blue":              rgb("#ADD8E6").toXY(),
+	"sky_blue":                rgb("#87CEEB").toXY(),
+	"light_sky_blue":          rgb("#87CEFA").toXY(),
+	"midnight_blue":           rgb("#191970").toXY(),
+	"dark_blue":               rgb("#00008B").toXY(),
+	"medium_blue":             rgb("#0000CD").toXY(),
+	"royal_blue":              rgb("#4169E1").toXY(),
+	"blue_violet":             rgb("#8A2BE2").toXY(),
+	"indigo":                  rgb("#4B0082").toXY(),
+	"dark_slate_blue":         rgb("#483D8B").toXY(),
+	"slate_blue":              rgb("#6A5ACD").toXY(),
+	"medium_slate_blue":       rgb("#7B68EE").toXY(),
+	"medium_purple":           rgb("#9370DB").toXY(),
+	"dark_magenta":            rgb("#8B008B").toXY(),
+	"dark_violet":             rgb("#9400D3").toXY(),
+	"dark_orchid":             rgb("#9932CC").toXY(),
+	"medium_orchid":           rgb("#BA55D3").toXY(),
+	"thistle":                 rgb("#D8BFD8").toXY(),
+	"plum":                    rgb("#DDA0DD").toXY(),
+	"violet":                  rgb("#EE82EE").toXY(),
+	"orchid":                  rgb("#DA70D6").toXY(),
+	"medium_violet_red":       rgb("#C71585").toXY(),
+	"pale_violet_red":         rgb("#DB7093").toXY(),
+	"deep_pink":               rgb("#FF1493").toXY(),
+	"hot_pink":                rgb("#FF69B4").toXY(),
+	"light_pink":              rgb("#FFB6C1").toXY(),
+	"pink":                    rgb("#FFC0CB").toXY(),
+	"antique_white":           rgb("#FAEBD7").toXY(),
+	"beige":                   rgb("#F5F5DC").toXY(),
+	"bisque":                  rgb("#FFE4C4").toXY(),
+	"blanched_almond":         rgb("#FFEBCD").toXY(),
+	"wheat":                   rgb("#F5DEB3").toXY(),
+	"corn_silk":               rgb("#FFF8DC").toXY(),
+	"lemon_chiffon":           rgb("#FFFACD").toXY(),
+	"light golden rod yellow": rgb("#FAFAD2").toXY(),
+	"light_yellow":            rgb("#FFFFE0").toXY(),
+	"saddle_brown":            rgb("#8B4513").toXY(),
+	"sienna":                  rgb("#A0522D").toXY(),
+	"chocolate":               rgb("#D2691E").toXY(),
+	"peru":                    rgb("#CD853F").toXY(),
+	"sandy_brown":             rgb("#F4A460").toXY(),
+	"burly_wood":              rgb("#DEB887").toXY(),
+	"tan":                     rgb("#D2B48C").toXY(),
+	"rosy_brown":              rgb("#BC8F8F").toXY(),
+	"moccasin":                rgb("#FFE4B5").toXY(),
+	"navajo_white":            rgb("#FFDEAD").toXY(),
+	"peach_puff":              rgb("#FFDAB9").toXY(),
+	"misty_rose":              rgb("#FFE4E1").toXY(),
+	"lavender_blush":          rgb("#FFF0F5").toXY(),
+	"linen":                   rgb("#FAF0E6").toXY(),
+	"old_lace":                rgb("#FDF5E6").toXY(),
+	"papaya_whip":             rgb("#FFEFD5").toXY(),
+	"sea_shell":               rgb("#FFF5EE").toXY(),
+	"mint_cream":              rgb("#F5FFFA").toXY(),
+	"slate_gray":              rgb("#708090").toXY(),
+	"light_slate_gray":        rgb("#778899").toXY(),
+	"light_steel_blue":        rgb("#B0C4DE").toXY(),
+	"lavender":                rgb("#E6E6FA").toXY(),
+	"floral_white":            rgb("#FFFAF0").toXY(),
+	"alice_blue":              rgb("#F0F8FF").toXY(),
+	"ghost_white":             rgb("#F8F8FF").toXY(),
+	"honeydew":                rgb("#F0FFF0").toXY(),
+	"ivory":                   rgb("#FFFFF0").toXY(),
+	"azure":                   rgb("#F0FFFF").toXY(),
+	"snow":                    rgb("#FFFAFA").toXY(),
+	"dim_gray":                rgb("#696969").toXY(),
+	"dark_gray":               rgb("#A9A9A9").toXY(),
+	"light_gray":              rgb("#D3D3D3").toXY(),
+	"gainsboro":               rgb("#DCDCDC").toXY(),
+	"white_smoke":             rgb("#F5F5F5").toXY(),
+}
+⋮----
+// basic colors
+⋮----
+// more colors
+⋮----
+// GetSupportColorList returns the list of the supported colors contained in the Table map
+func GetSupportColorList() []string
+⋮----
+// FindColorByName helps find a XY color by its name
+func FindColorByName(name string) (*XY, error)
+⋮----
+// rgb Local helper function that returns a pointer to a RGBHex value
+func rgb(v RGBHex) *RGBHex
+</file>
+
+<file path="util/color/conversion_test.go">
+package color
+⋮----
+import (
+	"fmt"
+	"testing"
+)
+⋮----
+"fmt"
+"testing"
+⋮----
+func TestRGBToXY(t *testing.T)
+⋮----
+func TestNewRGBFromHex(t *testing.T)
+⋮----
+func assertRGBFromHexString(t *testing.T, hexStr string, r int, g int, b int)
+</file>
+
+<file path="util/metrics_test.go">
+package util
+⋮----
+import (
+	"github.com/stretchr/testify/assert"
+	"testing"
+	"time"
+)
+⋮----
+"github.com/stretchr/testify/assert"
+"testing"
+"time"
+⋮----
+func TestNewTimer(t *testing.T)
+</file>
+
+<file path="util/metrics.go">
+package util
+⋮----
+import "time"
+⋮----
+// NewTimer creates a new started Timer
+func NewTimer() *Timer
+⋮----
+// Timer can be used to monitor the execution time of a given method
+type Timer struct {
+	t0 time.Time
+}
+⋮----
+func (t *Timer) start() *Timer
+⋮----
+// Reset sets the Timer initial time to time.Now()
+func (t *Timer) Reset() *Timer
+⋮----
+// SinceInMillis returns the elapsed time in milliseconds since the Timer was started or Reset
+func (t *Timer) SinceInMillis() int64
+</file>
+
+<file path="LICENSE">
+Apache License
+                           Version 2.0, January 2004
+                        http://www.apache.org/licenses/
+
+   TERMS AND CONDITIONS FOR USE, REPRODUCTION, AND DISTRIBUTION
+
+   1. Definitions.
+
+      "License" shall mean the terms and conditions for use, reproduction,
+      and distribution as defined by Sections 1 through 9 of this document.
+
+      "Licensor" shall mean the copyright owner or entity authorized by
+      the copyright owner that is granting the License.
+
+      "Legal Entity" shall mean the union of the acting entity and all
+      other entities that control, are controlled by, or are under common
+      control with that entity. For the purposes of this definition,
+      "control" means (i) the power, direct or indirect, to cause the
+      direction or management of such entity, whether by contract or
+      otherwise, or (ii) ownership of fifty percent (50%) or more of the
+      outstanding shares, or (iii) beneficial ownership of such entity.
+
+      "You" (or "Your") shall mean an individual or Legal Entity
+      exercising permissions granted by this License.
+
+      "Source" form shall mean the preferred form for making modifications,
+      including but not limited to software source code, documentation
+      source, and configuration files.
+
+      "Object" form shall mean any form resulting from mechanical
+      transformation or translation of a Source form, including but
+      not limited to compiled object code, generated documentation,
+      and conversions to other media types.
+
+      "Work" shall mean the work of authorship, whether in Source or
+      Object form, made available under the License, as indicated by a
+      copyright notice that is included in or attached to the work
+      (an example is provided in the Appendix below).
+
+      "Derivative Works" shall mean any work, whether in Source or Object
+      form, that is based on (or derived from) the Work and for which the
+      editorial revisions, annotations, elaborations, or other modifications
+      represent, as a whole, an original work of authorship. For the purposes
+      of this License, Derivative Works shall not include works that remain
+      separable from, or merely link (or bind by name) to the interfaces of,
+      the Work and Derivative Works thereof.
+
+      "Contribution" shall mean any work of authorship, including
+      the original version of the Work and any modifications or additions
+      to that Work or Derivative Works thereof, that is intentionally
+      submitted to Licensor for inclusion in the Work by the copyright owner
+      or by an individual or Legal Entity authorized to submit on behalf of
+      the copyright owner. For the purposes of this definition, "submitted"
+      means any form of electronic, verbal, or written communication sent
+      to the Licensor or its representatives, including but not limited to
+      communication on electronic mailing lists, source code control systems,
+      and issue tracking systems that are managed by, or on behalf of, the
+      Licensor for the purpose of discussing and improving the Work, but
+      excluding communication that is conspicuously marked or otherwise
+      designated in writing by the copyright owner as "Not a Contribution."
+
+      "Contributor" shall mean Licensor and any individual or Legal Entity
+      on behalf of whom a Contribution has been received by Licensor and
+      subsequently incorporated within the Work.
+
+   2. Grant of Copyright License. Subject to the terms and conditions of
+      this License, each Contributor hereby grants to You a perpetual,
+      worldwide, non-exclusive, no-charge, royalty-free, irrevocable
+      copyright license to reproduce, prepare Derivative Works of,
+      publicly display, publicly perform, sublicense, and distribute the
+      Work and such Derivative Works in Source or Object form.
+
+   3. Grant of Patent License. Subject to the terms and conditions of
+      this License, each Contributor hereby grants to You a perpetual,
+      worldwide, non-exclusive, no-charge, royalty-free, irrevocable
+      (except as stated in this section) patent license to make, have made,
+      use, offer to sell, sell, import, and otherwise transfer the Work,
+      where such license applies only to those patent claims licensable
+      by such Contributor that are necessarily infringed by their
+      Contribution(s) alone or by combination of their Contribution(s)
+      with the Work to which such Contribution(s) was submitted. If You
+      institute patent litigation against any entity (including a
+      cross-claim or counterclaim in a lawsuit) alleging that the Work
+      or a Contribution incorporated within the Work constitutes direct
+      or contributory patent infringement, then any patent licenses
+      granted to You under this License for that Work shall terminate
+      as of the date such litigation is filed.
+
+   4. Redistribution. You may reproduce and distribute copies of the
+      Work or Derivative Works thereof in any medium, with or without
+      modifications, and in Source or Object form, provided that You
+      meet the following conditions:
+
+      (a) You must give any other recipients of the Work or
+          Derivative Works a copy of this License; and
+
+      (b) You must cause any modified files to carry prominent notices
+          stating that You changed the files; and
+
+      (c) You must retain, in the Source form of any Derivative Works
+          that You distribute, all copyright, patent, trademark, and
+          attribution notices from the Source form of the Work,
+          excluding those notices that do not pertain to any part of
+          the Derivative Works; and
+
+      (d) If the Work includes a "NOTICE" text file as part of its
+          distribution, then any Derivative Works that You distribute must
+          include a readable copy of the attribution notices contained
+          within such NOTICE file, excluding those notices that do not
+          pertain to any part of the Derivative Works, in at least one
+          of the following places: within a NOTICE text file distributed
+          as part of the Derivative Works; within the Source form or
+          documentation, if provided along with the Derivative Works; or,
+          within a display generated by the Derivative Works, if and
+          wherever such third-party notices normally appear. The contents
+          of the NOTICE file are for informational purposes only and
+          do not modify the License. You may add Your own attribution
+          notices within Derivative Works that You distribute, alongside
+          or as an addendum to the NOTICE text from the Work, provided
+          that such additional attribution notices cannot be construed
+          as modifying the License.
+
+      You may add Your own copyright statement to Your modifications and
+      may provide additional or different license terms and conditions
+      for use, reproduction, or distribution of Your modifications, or
+      for any such Derivative Works as a whole, provided Your use,
+      reproduction, and distribution of the Work otherwise complies with
+      the conditions stated in this License.
+
+   5. Submission of Contributions. Unless You explicitly state otherwise,
+      any Contribution intentionally submitted for inclusion in the Work
+      by You to the Licensor shall be under the terms and conditions of
+      this License, without any additional terms or conditions.
+      Notwithstanding the above, nothing herein shall supersede or modify
+      the terms of any separate license agreement you may have executed
+      with Licensor regarding such Contributions.
+
+   6. Trademarks. This License does not grant permission to use the trade
+      names, trademarks, service marks, or product names of the Licensor,
+      except as required for reasonable and customary use in describing the
+      origin of the Work and reproducing the content of the NOTICE file.
+
+   7. Disclaimer of Warranty. Unless required by applicable law or
+      agreed to in writing, Licensor provides the Work (and each
+      Contributor provides its Contributions) on an "AS IS" BASIS,
+      WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
+      implied, including, without limitation, any warranties or conditions
+      of TITLE, NON-INFRINGEMENT, MERCHANTABILITY, or FITNESS FOR A
+      PARTICULAR PURPOSE. You are solely responsible for determining the
+      appropriateness of using or redistributing the Work and assume any
+      risks associated with Your exercise of permissions under this License.
+
+   8. Limitation of Liability. In no event and under no legal theory,
+      whether in tort (including negligence), contract, or otherwise,
+      unless required by applicable law (such as deliberate and grossly
+      negligent acts) or agreed to in writing, shall any Contributor be
+      liable to You for damages, including any direct, indirect, special,
+      incidental, or consequential damages of any character arising as a
+      result of this License or out of the use or inability to use the
+      Work (including but not limited to damages for loss of goodwill,
+      work stoppage, computer failure or malfunction, or any and all
+      other commercial damages or losses), even if such Contributor
+      has been advised of the possibility of such damages.
+
+   9. Accepting Warranty or Additional Liability. While redistributing
+      the Work or Derivative Works thereof, You may choose to offer,
+      and charge a fee for, acceptance of support, warranty, indemnity,
+      or other liability obligations and/or rights consistent with this
+      License. However, in accepting such obligations, You may act only
+      on Your own behalf and on Your sole responsibility, not on behalf
+      of any other Contributor, and only if You agree to indemnify,
+      defend, and hold each Contributor harmless for any liability
+      incurred by, or claims asserted against, such Contributor by reason
+      of your accepting any such warranty or additional liability.
+
+   END OF TERMS AND CONDITIONS
+
+   APPENDIX: How to apply the Apache License to your work.
+
+      To apply the Apache License to your work, attach the following
+      boilerplate notice, with the fields enclosed by brackets "[]"
+      replaced with your own identifying information. (Don't include
+      the brackets!)  The text should be enclosed in the appropriate
+      comment syntax for the file format. We also recommend that a
+      file or class name and description of purpose be included on the
+      same "printed page" as the copyright notice for easier
+      identification within third-party archives.
+
+   Copyright [yyyy] [name of copyright owner]
+
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+</file>
+
+<file path="cmd/get/get_scene_test.go">
+package get
+⋮----
+import (
+	oh "github.com/openhue/openhue-go"
+	"github.com/stretchr/testify/assert"
+	"openhue-cli/openhue"
+	"testing"
+)
+⋮----
+oh "github.com/openhue/openhue-go"
+"github.com/stretchr/testify/assert"
+"openhue-cli/openhue"
+"testing"
+⋮----
+func TestGetAllScenes(t *testing.T)
+⋮----
+func NewFakeHome() *openhue.HomeModel
+</file>
+
+<file path="cmd/get/get_scene.go">
+package get
+⋮----
+import (
+	"github.com/spf13/cobra"
+	"openhue-cli/openhue"
+	"openhue-cli/util"
+	"strconv"
+)
+⋮----
+"github.com/spf13/cobra"
+"openhue-cli/openhue"
+"openhue-cli/util"
+"strconv"
+⋮----
+type SceneOptions struct {
+	*CmdGetOptions
+	Room string
+}
+⋮----
+// NewCmdGetScene returns initialized Command instance for the 'get scene' sub command
+func NewCmdGetScene(ctx *openhue.Context, co *CmdGetOptions) *cobra.Command
+⋮----
+func (o *SceneOptions) RunGetSceneCmd(ctx *openhue.Context, args []string)
+⋮----
+var scenes []openhue.Scene
+⋮----
+func PrintScene(scene openhue.Scene) string
+</file>
+
+<file path="cmd/set/common.go">
+package set
+⋮----
+import (
+	"fmt"
+	"github.com/spf13/cobra"
+	"openhue-cli/openhue"
+	"openhue-cli/util/color"
+)
+⋮----
+"fmt"
+"github.com/spf13/cobra"
+"openhue-cli/openhue"
+"openhue-cli/util/color"
+⋮----
+//
+// Set Light flags, used by the 'set light' and 'set room' commands
+⋮----
+type CmdSetLightFlags struct {
+	On          bool
+	Off         bool
+	Brightness  float32
+	Rgb         string
+	X           float32
+	Y           float32
+	ColorName   string
+	Temperature int
+}
+⋮----
+func (flags *CmdSetLightFlags) initCmd(cmd *cobra.Command)
+⋮----
+// on/off flags
+⋮----
+// Brightness flag
+⋮----
+//
+// Color flags
+⋮----
+// rgb
+⋮----
+// xy
+⋮----
+// name
+⋮----
+// temperature
+⋮----
+// exclusions
+⋮----
+// toSetLightOptions makes sure provided values for LightOptions are valid
+func (flags *CmdSetLightFlags) toSetLightOptions() (*openhue.SetLightOptions, error)
+⋮----
+// validate the --brightness flag
+⋮----
+// validate the temperature flag
+⋮----
+// color in RGB
+⋮----
+// color in CIE space
+⋮----
+// color from enum
+</file>
+
+<file path="cmd/set/set_scene.go">
+package set
+⋮----
+import (
+	"errors"
+	oh "github.com/openhue/openhue-go"
+	log "github.com/sirupsen/logrus"
+	"github.com/spf13/cobra"
+	"openhue-cli/openhue"
+)
+⋮----
+"errors"
+oh "github.com/openhue/openhue-go"
+log "github.com/sirupsen/logrus"
+"github.com/spf13/cobra"
+"openhue-cli/openhue"
+⋮----
+const (
+	setSceneDocShort = "Activate a scene"
+	setSceneDocLong  = `
+This command allows the activate a scene using either a static or a dynamic palette.
+`
+	setSceneDocExample = `
+# Activate a scene
+openhue set scene Soho
+
+# Activate a scene by ID
+openhue set scene 62af7df3-d390-4408-a7ac-4b6b8805531b
+
+# Activate a scene in a specific room
+openhue set scene Soho -r Studio
+
+# Activate a scene with a dynamic palette
+openhue set scene Soho -a dynamic`
+)
+⋮----
+type CmdSetSceneOptions struct {
+	action actionEnum
+	room   string
+}
+⋮----
+// NewCmdSetScene returns initialized cobra.Command instance for the 'set scene' sub command
+func NewCmdSetScene(ctx *openhue.Context) *cobra.Command
+⋮----
+// action flag
+⋮----
+type actionEnum string
+⋮----
+const (
+	active  actionEnum = "active"
+	static  actionEnum = "static"
+	dynamic actionEnum = "dynamic"
+)
+⋮----
+// String is used both by fmt.Print and by Cobra in help text
+func (e *actionEnum) String() string
+⋮----
+// Set must have pointer receiver so it doesn't change the value of a copy
+func (e *actionEnum) Set(v string) error
+⋮----
+// Type is only used in help text
+func (e *actionEnum) Type() string
+⋮----
+func (e *actionEnum) toSceneRecallAction() oh.SceneRecallAction
+⋮----
+func (o *CmdSetSceneOptions) roomMsg() string
+</file>
+
+<file path="cmd/setup/config_test.go">
+package setup
+⋮----
+import (
+	"openhue-cli/openhue"
+	"openhue-cli/openhue/test/assert"
+	"testing"
+)
+⋮----
+"openhue-cli/openhue"
+"openhue-cli/openhue/test/assert"
+"testing"
+⋮----
+func TestNewCmdConfigure(t *testing.T)
+</file>
+
+<file path="openhue/test/assert/assert.go">
+package assert
+⋮----
+import (
+	"github.com/spf13/cobra"
+	"testing"
+)
+⋮----
+"github.com/spf13/cobra"
+"testing"
+⋮----
+// ThatLineEqualsTo verifies that an `idx` line contained in the `lines` slice should be equal to the `expected` value
+func ThatLineEqualsTo(t *testing.T, lines []string, idx int, expected string)
+⋮----
+// ThatCmdUseIs verifies that the command Use is valid
+func ThatCmdUseIs(t *testing.T, cmd *cobra.Command, expectedUse string)
+⋮----
+// ThatCmdGroupIs verifies that the command GroupID is valid
+func ThatCmdGroupIs(t *testing.T, cmd *cobra.Command, expectedGroup string)
+</file>
+
+<file path="openhue/buildinfo_test.go">
+package openhue
+⋮----
+import (
+	"github.com/stretchr/testify/assert"
+	"testing"
+)
+⋮----
+"github.com/stretchr/testify/assert"
+"testing"
+⋮----
+func TestNewTestBuildInfo(t *testing.T)
+</file>
+
+<file path="util/color/color_test.go">
+package color
+⋮----
+import "testing"
+⋮----
+func TestConvertHexToXY(t *testing.T)
+⋮----
+var c RGBHex = "#123456"
+⋮----
+func TestFailToConvertHexToXY(t *testing.T)
+⋮----
+var c RGBHex = "#foo"
+</file>
+
+<file path="util/color/constant_test.go">
+package color
+⋮----
+import (
+	"openhue-cli/openhue/test"
+	"testing"
+)
+⋮----
+"openhue-cli/openhue/test"
+"testing"
+⋮----
+func TestFindColorByName(t *testing.T)
+⋮----
+func TestCannotFindColorByName(t *testing.T)
+</file>
+
+<file path="util/color/conversion.go">
+package color
+⋮----
+import (
+	"errors"
+	"math"
+	"strconv"
+)
+⋮----
+"errors"
+"math"
+"strconv"
+⋮----
+// ToXY RGB to XY conversion
+// Based on https://developers.meethue.com/develop/application-design-guidance/color-conversion-formulas-rgb-to-xy-and-back/
+func (c *RGB) ToXY() *XY
+⋮----
+// Gamma correction
+⋮----
+// Convert the RGB values to XYZ using the Wide RGB D65 conversion formula
+⋮----
+// Calculate the xy values from the XYZ values
+⋮----
+// NewRGBFomHex Converts a hexadecimal string representation of a color to its RGB value.
+// Example: #FF0000 will return RGB{255, 0, 0}
+func NewRGBFomHex(hex string) (*RGB, error)
+⋮----
+func gammaCorrection(color *float32)
+</file>
+
+<file path="util/logger/logger.go">
+package logger
+⋮----
+import (
+	log "github.com/sirupsen/logrus"
+	"os"
+)
+⋮----
+log "github.com/sirupsen/logrus"
+"os"
+⋮----
+func Init(path string)
+⋮----
+// If the file doesn't exist, create it or append to the file
+⋮----
+func isProd() bool
+</file>
+
+<file path="Dockerfile">
+FROM scratch
+COPY openhue /
+ENTRYPOINT ["/openhue"]
+</file>
+
+<file path="cmd/set/set_room.go">
+package set
+⋮----
+import (
+	"github.com/spf13/cobra"
+	"openhue-cli/openhue"
+)
+⋮----
+"github.com/spf13/cobra"
+"openhue-cli/openhue"
+⋮----
+const (
+	setRoomDocShort = "Update one or multiple rooms (on/off, brightness, color)"
+⋮----
+// NewCmdSetRoom returns initialized cobra.Command instance for the 'set room' sub command
+func NewCmdSetRoom(ctx *openhue.Context) *cobra.Command
+</file>
+
+<file path="cmd/setup/config.go">
+package setup
+⋮----
+import (
+	"github.com/spf13/cobra"
+	"openhue-cli/openhue"
+)
+⋮----
+"github.com/spf13/cobra"
+"openhue-cli/openhue"
+⋮----
+const (
+	docShortConfigure = `Manual openhue CLI setup`
+	docLongConfigure  = `
+The setup command must be run as a prerequisite for all resource related commands (controlling lights, rooms, scenes, etc.)
+⋮----
+type Options struct {
+	bridge string
+	key    string
+}
+⋮----
+// NewCmdConfigure creates the configure command
+func NewCmdConfigure(io openhue.IOStreams) *cobra.Command
+</file>
+
+<file path="cmd/version/version_test.go">
+package version
+⋮----
+import (
+	"openhue-cli/openhue"
+	"openhue-cli/openhue/test/assert"
+	"strings"
+	"testing"
+)
+⋮----
+"openhue-cli/openhue"
+"openhue-cli/openhue/test/assert"
+"strings"
+"testing"
+⋮----
+const (
+	Line1 = "#  Version\t 1.0.0"
+	Line2 = "#   Commit\t https://github.com/openhue/openhue-cli/commit/1234"
+	Line3 = "# Built at\t now"
+)
+⋮----
+func TestNewCmdVersion(t *testing.T)
+</file>
+
+<file path="cmd/version/version.go">
+package version
+⋮----
+import (
+	"github.com/spf13/cobra"
+	"openhue-cli/openhue"
+)
+⋮----
+"github.com/spf13/cobra"
+"openhue-cli/openhue"
+⋮----
+const (
+	BaseCommitUrl = "https://github.com/openhue/openhue-cli/commit/"
+)
+⋮----
+func NewCmdVersion(ctx *openhue.Context) *cobra.Command
+</file>
+
+<file path="openhue/home_context.go">
+package openhue
+⋮----
+import (
+	"github.com/openhue/openhue-go"
+	log "github.com/sirupsen/logrus"
+)
+⋮----
+"github.com/openhue/openhue-go"
+log "github.com/sirupsen/logrus"
+⋮----
+type hueHomeCtx struct {
+	h *openhue.Home
+	// context
+	home          *openhue.BridgeHomeGet
+	rooms         map[string]openhue.RoomGet
+	devices       map[string]openhue.DeviceGet
+	lights        map[string]openhue.LightGet
+	groupedLights map[string]openhue.GroupedLightGet
+	scenes        map[string]openhue.SceneGet
+}
+⋮----
+// context
+⋮----
+func loadHueHomeCtx(home *openhue.Home) (*hueHomeCtx, error)
+</file>
+
+<file path="openhue/io.go">
+package openhue
+⋮----
+import (
+	"bytes"
+	"fmt"
+	log "github.com/sirupsen/logrus"
+	"io"
+	"os"
+)
+⋮----
+"bytes"
+"fmt"
+log "github.com/sirupsen/logrus"
+"io"
+"os"
+⋮----
+type Console interface {
+	Printf(format string, a ...any)
+	Println(a ...any)
+
+	ErrPrintf(format string, a ...any)
+	ErrPrintln(a ...any)
+}
+⋮----
+// IOStreams provides the standard names for io streams.
+// This is useful for embedding and for unit testing.
+type IOStreams struct {
+	Console
+	// In think, os.Stdin
+	In io.Reader
+	// Out think, os.Stdout
+	Out io.Writer
+	// ErrOut think, os.Stderr
+	ErrOut io.Writer
+}
+⋮----
+// In think, os.Stdin
+⋮----
+// Out think, os.Stdout
+⋮----
+// ErrOut think, os.Stderr
+⋮----
+// NewIOStreams returns a valid IOStreams with the default os.Stdin, os.Stdout and os.Stderr thinks
+func NewIOStreams() IOStreams
+⋮----
+// NewTestIOStreams returns a valid IOStreams and in, out, errOut buffers for unit tests
+func NewTestIOStreams() (IOStreams, *bytes.Buffer, *bytes.Buffer, *bytes.Buffer)
+⋮----
+// NewTestIOStreamsDiscard returns a valid IOStreams that just discards
+func NewTestIOStreamsDiscard() IOStreams
+⋮----
+//
+// Console implementation
+⋮----
+func (io *IOStreams) Printf(format string, a ...any)
+⋮----
+func (io *IOStreams) Println(a ...any)
+⋮----
+func (io *IOStreams) ErrPrintf(format string, a ...any)
+⋮----
+func (io *IOStreams) ErrPrintln(a ...any)
+</file>
+
+<file path="util/utils_test.go">
+package util
+⋮----
+import (
+	"openhue-cli/openhue"
+	"openhue-cli/openhue/test/assert"
+	"strings"
+	"testing"
+)
+⋮----
+"openhue-cli/openhue"
+"openhue-cli/openhue/test/assert"
+"strings"
+"testing"
+⋮----
+type Light struct {
+	Id   string `json:"id"`
+	Name string `json:"name"`
+}
+⋮----
+func PrintLightLineProcessor(light Light) string
+⋮----
+func TestPrintTable(t *testing.T)
+⋮----
+func TestPrintJsonArrayWithOneElement(t *testing.T)
+⋮----
+func TestPrintJsonArrayWithTwoElements(t *testing.T)
+</file>
+
+<file path="util/utils.go">
+package util
+⋮----
+import (
+	"encoding/json"
+	"fmt"
+	"openhue-cli/openhue"
+	"text/tabwriter"
+)
+⋮----
+"encoding/json"
+"fmt"
+"openhue-cli/openhue"
+"text/tabwriter"
+⋮----
+// PrintJsonArray formats the input array as JSON and prints it. If the length of the array is equal to 1,
+// it will print it as a single object
+func PrintJsonArray[T any](streams openhue.IOStreams, array []T)
+⋮----
+func PrintJson[T any](io openhue.IOStreams, array T)
+⋮----
+var out []byte
+⋮----
+// PrintTable prints each line of the objects contained in the table value
+func PrintTable[T any](io openhue.IOStreams, table []T, lineFn func(T) string, header ...string)
+</file>
+
+<file path=".codeclimate.yml">
+plugins:
+  gofmt:
+    enabled: true
+  govet:
+    enabled: true
+
+# We don't want the scan and analyze generated code
+exclude_patterns:
+  - openhue/gen/openhue.openhue.go
+</file>
+
+<file path="openhue/context_test.go">
+package openhue
+⋮----
+import (
+	"github.com/openhue/openhue-go"
+	"github.com/stretchr/testify/assert"
+	"testing"
+)
+⋮----
+"github.com/openhue/openhue-go"
+"github.com/stretchr/testify/assert"
+"testing"
+⋮----
+func TestNewContext(t *testing.T)
+⋮----
+func TestNewTestContextWithoutApi(t *testing.T)
+</file>
+
+<file path="openhue/home_service_test.go">
+package openhue
+⋮----
+import (
+	"github.com/openhue/openhue-go"
+	"github.com/stretchr/testify/assert"
+	"testing"
+)
+⋮----
+"github.com/openhue/openhue-go"
+"github.com/stretchr/testify/assert"
+"testing"
+⋮----
+var home = mockHome()
+⋮----
+func TestFindAllLights(t *testing.T)
+⋮----
+func TestFindLightsByName(t *testing.T)
+⋮----
+func TestFindLightsByIds(t *testing.T)
+⋮----
+func TestFindAllRooms(t *testing.T)
+⋮----
+func TestFindRoomsByName(t *testing.T)
+⋮----
+func TestFindRoomById(t *testing.T)
+⋮----
+//
+// internal
+⋮----
+func mockHome() *HomeModel
+⋮----
+func mockRoom(name string) Room
+⋮----
+func mockDeviceWithLight(parent Room, name string) Device
+</file>
+
+<file path=".gitignore">
+# IntelliJ folder
+.idea/
+*.iml
+
+# CMake
+cmake-build-*/
+
+# File-based project format
+*.iws
+
+# IntelliJ
+out/
+
+# Crashlytics plugin (for Android Studio and IntelliJ)
+com_crashlytics_export_strings.xml
+crashlytics.properties
+crashlytics-build.properties
+fabric.properties
+
+### Go template
+# If you prefer the allow list template instead of the deny list, see community template:
+# https://github.com/github/gitignore/blob/main/community/Golang/Go.AllowList.gitignore
+#
+# Binaries for programs and plugins
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test binary, built with `go test -c`
+*.test
+
+# Output of the go coverage tool, specifically when used with LiteIDE
+*.out
+coverage.html
+
+# Go workspace file
+go.work
+
+# Build folder
+bin/
+
+# Gorelease build folder
+dist/
+</file>
+
+<file path="cmd/get/get_light.go">
+package get
+⋮----
+import (
+	"fmt"
+	"github.com/spf13/cobra"
+	"openhue-cli/openhue"
+	"openhue-cli/util"
+)
+⋮----
+"fmt"
+"github.com/spf13/cobra"
+"openhue-cli/openhue"
+"openhue-cli/util"
+⋮----
+const (
+	docLongGetLight = `
+Fetches and displays all available lights
+`
+	docExampleGetLight = `
+# List all lights as a table
+openhue get lights
+
+# List all lights as JSON
+openhue get lights --json
+
+# Get details for a single light
+openhue get light aa31ba26-98a7-4830-8ae9-1b7caa8b5700 --json
+
+# Get light by name
+openhue get light "Hue Go"
+
+# List all lights for a specific room
+openhue get light --room "Living Room"
+`
+)
+⋮----
+type LightOptions struct {
+	*CmdGetOptions
+	Room string
+}
+⋮----
+// NewCmdGetLight returns initialized Command instance for the 'get light' sub command
+func NewCmdGetLight(ctx *openhue.Context, co *CmdGetOptions) *cobra.Command
+⋮----
+func (o *LightOptions) RunGetLightCmd(ctx *openhue.Context, args []string)
+⋮----
+func PrintLight(light openhue.Light) string
+⋮----
+room := light.Parent.Parent.Name // parent of a light is the device that belongs to a room
+</file>
+
+<file path="cmd/get/get_room.go">
+package get
+⋮----
+import (
+	"fmt"
+	"github.com/spf13/cobra"
+	"openhue-cli/openhue"
+	"openhue-cli/util"
+)
+⋮----
+"fmt"
+"github.com/spf13/cobra"
+"openhue-cli/openhue"
+"openhue-cli/util"
+⋮----
+const (
+	docLongGetRoom = `
+Fetches and displays all available rooms from the Philips Hue bridge
+`
+	docExampleGetRoom = `
+# List all rooms as a table
+openhue get room
+
+# List all rooms as JSON
+openhue get room --json
+
+# Get details for a single room
+openhue get room aa31ba26-98a7-4830-8ae9-1b7caa8b5700 --json
+
+# Get room by name
+openhue get room -n "Studio"
+`
+)
+⋮----
+// NewCmdGetRoom returns initialized Command instance for the 'get light' sub command
+func NewCmdGetRoom(ctx *openhue.Context, o *CmdGetOptions) *cobra.Command
+⋮----
+func RunGetRoomCmd(ctx *openhue.Context, o *CmdGetOptions, args []string)
+⋮----
+func PrintRoom(room openhue.Room) string
+</file>
+
+<file path="cmd/setup/discover.go">
+package setup
+⋮----
+import (
+	oh "github.com/openhue/openhue-go"
+	"github.com/spf13/cobra"
+	"openhue-cli/openhue"
+	"time"
+)
+⋮----
+oh "github.com/openhue/openhue-go"
+"github.com/spf13/cobra"
+"openhue-cli/openhue"
+"time"
+⋮----
+// NewCmdDiscover represents the discover command
+func NewCmdDiscover(io openhue.IOStreams) *cobra.Command
+</file>
+
+<file path="cmd/setup/setup.go">
+package setup
+⋮----
+import (
+	"fmt"
+	oh "github.com/openhue/openhue-go"
+	log "github.com/sirupsen/logrus"
+	"github.com/spf13/cobra"
+	"openhue-cli/openhue"
+	"os"
+	"time"
+)
+⋮----
+"fmt"
+oh "github.com/openhue/openhue-go"
+log "github.com/sirupsen/logrus"
+"github.com/spf13/cobra"
+"openhue-cli/openhue"
+"os"
+"time"
+⋮----
+const hueBridgeDiscover = "https://discovery.meethue.com"
+⋮----
+type CmdSetupOptions struct {
+	deviceType        string
+	generateClientKey bool
+	bridge            string
+}
+⋮----
+func NewCmdSetup(io openhue.IOStreams) *cobra.Command
+⋮----
+func startSetup(io openhue.IOStreams, o *CmdSetupOptions)
+⋮----
+// this is an expected error, we just wait for the user to push the button
+⋮----
+// this is unexpected, let's print the error and exit
+⋮----
+func getBridgeIPAddress(io openhue.IOStreams, o *CmdSetupOptions) (string, error)
+⋮----
+func saveConfig(bridge string, key string) (string, error)
+⋮----
+func getHostName() string
+</file>
+
+<file path="openhue/context.go">
+package openhue
+⋮----
+import (
+	"bytes"
+	"github.com/openhue/openhue-go"
+)
+⋮----
+"bytes"
+"github.com/openhue/openhue-go"
+⋮----
+// Context contains the common objects for the different commands.
+type Context struct {
+	Io        IOStreams
+	BuildInfo *BuildInfo
+	H         *openhue.Home
+	Home      *HomeModel
+	Config    *Config
+}
+⋮----
+// NewContext returns an initialized Context from a given openhue.ClientWithResponses API with default IOStreams
+func NewContext(io IOStreams, buildInfo *BuildInfo, home *openhue.Home, config *Config) *Context
+⋮----
+// NewTestContext returns a Context for testing usage only and the out buffer to validate
+// the command output.
+// The Api field of the returned Context is not set.
+func NewTestContext(home *HomeModel) (*Context, *bytes.Buffer)
+</file>
+
+<file path="openhue/home_service.go">
+package openhue
+⋮----
+import (
+	"fmt"
+	"github.com/openhue/openhue-go"
+	log "github.com/sirupsen/logrus"
+)
+⋮----
+"fmt"
+"github.com/openhue/openhue-go"
+log "github.com/sirupsen/logrus"
+⋮----
+func LoadHome(h *openhue.Home) (*HomeModel, error)
+⋮----
+Parent: nil, // explicitly set Parent to nil as HomeModel is the root object
+⋮----
+//
+// Light
+⋮----
+// SearchLights returns a slice of Light optionally filtered by their room and their IDs or names
+func SearchLights(home *HomeModel, roomNameOrId string, nameOrIds []string) []Light
+⋮----
+var lights []Light
+⋮----
+// Room
+⋮----
+func SearchRooms(home *HomeModel, nameOrIds []string) []Room
+⋮----
+var rooms []Room
+⋮----
+// Scene
+⋮----
+// SearchScenes returns a slice of Scene filtered by the room
+func SearchScenes(home *HomeModel, roomNameOrId string, nameOrIds []string) []Scene
+⋮----
+var scenes []Scene
+⋮----
+// Private
+⋮----
+func (t HomeResourceType) is(r openhue.ResourceIdentifierRtype) bool
+⋮----
+func getRooms(ctx *hueHomeCtx, parent *Resource, children *[]openhue.ResourceIdentifier) []Room
+⋮----
+// getScenes returns a slice of Scene that belong to a given Room
+func getScenes(ctx *hueHomeCtx, room *Resource) []Scene
+⋮----
+func getDevices(ctx *hueHomeCtx, parent *Resource, children *[]openhue.ResourceIdentifier) []Device
+⋮----
+var devices []Device
+⋮----
+func getGroupedLight(ctx *hueHomeCtx, parent *Resource, services *[]openhue.ResourceIdentifier) (*GroupedLight, error)
+⋮----
+func getLight(ctx *hueHomeCtx, parent *Resource, services *[]openhue.ResourceIdentifier) (*Light, error)
+</file>
+
+<file path=".github/workflows/build.yml">
+# PR Builder Action
+
+name: Build
+
+on:
+  # Triggers the workflow on push or pull request events but only for the "main" branch
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: actions/setup-go@v4
+        with:
+          go-version: '1.22.3'
+
+      - name: Test & publish code coverage
+        uses: paambaati/codeclimate-action@v5.0.0
+        env:
+          CC_TEST_REPORTER_ID: 64da8b499e15dc84234cbe4ff019d5d533718ca6768807d2aa0057f56add2e8c
+        with:
+          coverageCommand: make coverage
+          debug: true
+          prefix: ${{ github.event.repository.name }}
+          coverageLocations:
+            "${{github.workspace}}/c.out:gocov"
+</file>
+
+<file path=".github/workflows/release.yml">
+# Packaging & Releasing OpenHue CLI
+
+name: Release
+on:
+  push:
+    tags:
+      - '*'
+
+permissions:
+  contents: write
+
+jobs:
+  goreleaser:
+    runs-on: ubuntu-latest
+    steps:
+
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: Fetch all tags
+        run: git fetch --force --tags
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.21'
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Run GoReleaser
+        uses: goreleaser/goreleaser-action@v5
+        with:
+          distribution: goreleaser
+          version: latest
+          args: release --clean
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          OPENHUE_HOMEBREW_CLI_TOKEN: ${{ secrets.OPENHUE_HOMEBREW_CLI_TOKEN }}
+</file>
+
+<file path="cmd/set/set.go">
+package set
+⋮----
+import (
+	"github.com/spf13/cobra"
+	"openhue-cli/openhue"
+)
+⋮----
+"github.com/spf13/cobra"
+"openhue-cli/openhue"
+⋮----
+// NewCmdSet returns an initialized Command instance for 'set' sub command
+func NewCmdSet(ctx *openhue.Context) *cobra.Command
+</file>
+
+<file path="openhue/home_model.go">
+package openhue
+⋮----
+import (
+	"github.com/openhue/openhue-go"
+	"github.com/spf13/cobra"
+	"openhue-cli/util/color"
+)
+⋮----
+"github.com/openhue/openhue-go"
+"github.com/spf13/cobra"
+"openhue-cli/util/color"
+⋮----
+type HomeResourceType openhue.ResourceIdentifierRtype
+⋮----
+type Resource struct {
+	Id     string
+	Name   string
+	Type   HomeResourceType
+	Parent *Resource
+	// internal
+	ctx *hueHomeCtx
+}
+⋮----
+// internal
+⋮----
+// matchesNameOrId returns true of the given parameter equals either the Resource Name or Id.
+// If the parameter is empty, true is returned.
+func (r *Resource) matchesNameOrId(nameOrId string) bool
+⋮----
+//
+// HomeModel
+⋮----
+type HomeModel struct {
+	Resource
+	Rooms   []Room
+	Devices []Device
+	HueData *openhue.BridgeHomeGet
+}
+⋮----
+// Room
+⋮----
+type Room struct {
+	Resource
+	Devices []Device
+	Scenes  []Scene
+	HueData *openhue.RoomGet
+
+	// Services
+	GroupedLight *GroupedLight
+}
+⋮----
+// Services
+⋮----
+// Device
+⋮----
+type Device struct {
+	Resource
+	HueData *openhue.DeviceGet
+
+	// Services
+	Light *Light
+}
+⋮----
+// Light
+⋮----
+type SetLightOptions struct {
+	Status      LightStatus
+	Brightness  float32
+	Color       color.XY
+	Temperature int
+}
+⋮----
+func NewSetLightOptions() *SetLightOptions
+⋮----
+type LightStatus string
+⋮----
+const (
+	LightStatusOn        LightStatus = "on"
+	LightStatusOff       LightStatus = "off"
+	LightStatusUndefined LightStatus = "undefined"
+)
+⋮----
+// ToBool converts a LightStatus to its bool value. LightStatusUndefined is considered as false.
+func ToBool(status LightStatus) *bool
+⋮----
+type LightService interface {
+	IsOn() bool
+	Set(options SetLightOptions)
+}
+⋮----
+type Light struct {
+	Resource
+	LightService
+	HueData *openhue.LightGet
+}
+⋮----
+func (light *Light) IsOn() bool
+⋮----
+func (light *Light) Set(o *SetLightOptions)
+⋮----
+type GroupedLight struct {
+	Resource
+	LightService
+	HueData *openhue.GroupedLightGet
+}
+⋮----
+// Scene
+⋮----
+type SceneService interface {
+	Activate()
+}
+⋮----
+type Scene struct {
+	Resource
+	SceneService
+	HueData *openhue.SceneGet
+}
+⋮----
+func (scene *Scene) Activate(action openhue.SceneRecallAction) error
+</file>
+
+<file path="cmd/set/set_light.go">
+package set
+⋮----
+import (
+	log "github.com/sirupsen/logrus"
+	"github.com/spf13/cobra"
+	"openhue-cli/openhue"
+)
+⋮----
+log "github.com/sirupsen/logrus"
+"github.com/spf13/cobra"
+"openhue-cli/openhue"
+⋮----
+const (
+	docShort = "Update one or multiple lights (on/off, brightness, color)"
+⋮----
+var room = ""
+⋮----
+// NewCmdSetLight returns initialized Command instance for the 'set light' sub command
+func NewCmdSetLight(ctx *openhue.Context) *cobra.Command
+</file>
+
+<file path="cmd/get/get.go">
+package get
+⋮----
+import (
+	oh "github.com/openhue/openhue-go"
+	"github.com/spf13/cobra"
+	"openhue-cli/openhue"
+	"openhue-cli/util"
+)
+⋮----
+oh "github.com/openhue/openhue-go"
+"github.com/spf13/cobra"
+"openhue-cli/openhue"
+"openhue-cli/util"
+⋮----
+type CmdGetOptions struct {
+	Json bool
+}
+⋮----
+// NewCmdGet returns an initialized Command instance for 'get' sub command
+func NewCmdGet(ctx *openhue.Context) *cobra.Command
+⋮----
+// local flags
+⋮----
+// persistence flags
+⋮----
+// sub commands
+⋮----
+func RunGetAllResources(ctx *openhue.Context, typeFlag string, o *CmdGetOptions)
+⋮----
+var resources []oh.ResourceGet
+⋮----
+func PrintResource(resource oh.ResourceGet) string
+</file>
+
+<file path="main.go">
+package main
+⋮----
+//go:generate make generate
+⋮----
+import (
+	"openhue-cli/cmd"
+	"openhue-cli/openhue"
+)
+⋮----
+"openhue-cli/cmd"
+"openhue-cli/openhue"
+⋮----
+var (
+	version = "dev"
+	commit  = "none"
+	date    = "unknown"
+)
+⋮----
+func main()
+</file>
+
+<file path="openhue/config.go">
+package openhue
+⋮----
+import (
+	"context"
+	"crypto/tls"
+	"errors"
+	"fmt"
+	"github.com/openhue/openhue-go"
+	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
+	"net/http"
+	"openhue-cli/util/logger"
+	"os"
+	"path/filepath"
+	"slices"
+)
+⋮----
+"context"
+"crypto/tls"
+"errors"
+"fmt"
+"github.com/openhue/openhue-go"
+"github.com/spf13/cobra"
+"github.com/spf13/viper"
+"net/http"
+"openhue-cli/util/logger"
+"os"
+"path/filepath"
+"slices"
+⋮----
+// CommandsWithNoConfig contains the list of commands that don't require the configuration to exist
+var CommandsWithNoConfig = []string{"setup", "config", "help", "discover", "auth", "version", "completion"}
+var configPath string
+⋮----
+func init()
+⋮----
+// Find home directory.
+⋮----
+type Config struct {
+	// The IP of the Philips HUE Bridge
+	Bridge string
+	// The HUE Application Key
+	Key string
+}
+⋮----
+// The IP of the Philips HUE Bridge
+⋮----
+// The HUE Application Key
+⋮----
+func (c *Config) GetConfigFile() string
+⋮----
+func (c *Config) Load()
+⋮----
+// When trying to run CLI without configuration
+⋮----
+func (c *Config) Save() (string, error)
+⋮----
+// NewOpenHueClient Creates a new NewClientWithResponses for a given server and hueApplicationKey.
+// This function will also skip SSL verification, as the Philips HUE Bridge exposes a self-signed certificate.
+func (c *Config) NewOpenHueClient() *openhue.ClientWithResponses
+⋮----
+// skip SSL Verification
+⋮----
+// NewOpenHueClientNoAuth Creates a new NewClientWithResponses for a given server and no application Key.
+⋮----
+func NewOpenHueClientNoAuth(ip string) *openhue.ClientWithResponses
+</file>
+
+<file path=".goreleaser.yaml">
+project_name: openhue
+
+before:
+  hooks:
+    - go mod tidy
+
+universal_binaries:
+  - id: openhue
+    replace: true
+
+builds:
+  - id: openhue
+    binary: openhue
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - windows
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+
+dockers:
+  - id: openhue
+    image_templates:
+      - openhue/cli:latest
+      - openhue/cli:{{ .Tag }}
+    build_flag_templates:
+      - "--pull"
+      - "--label=org.opencontainers.image.created={{.Date}}"
+      - "--label=org.opencontainers.image.title={{.ProjectName}}"
+      - "--label=org.opencontainers.image.description={{.ProjectName}}"
+      - "--label=org.opencontainers.image.revision={{.FullCommit}}"
+      - "--label=org.opencontainers.image.version={{.Version}}"
+      - "--label=org.opencontainers.image.url=https://github.com/openhue/openhue-cli"
+
+brews:
+  - name: openhue-cli
+    homepage: https://github.com/openhue/homebrew-cli
+    description: OpenHue CLI is a command-line interface for interacting with Philips Hue smart lighting systems
+    license: Apache License 2.0
+    repository:
+      owner: openhue
+      name: homebrew-cli
+      token: "{{ .Env.OPENHUE_HOMEBREW_CLI_TOKEN }}"
+
+archives:
+  - id: openhue
+    format: tar.gz
+    # this name template makes the OS and Arch compatible with the results of `uname`.
+    name_template: >-
+      {{ .ProjectName }}_
+      {{- title .Os }}_
+      {{- if eq .Arch "amd64" }}x86_64
+      {{- else if eq .Arch "386" }}i386
+      {{- else }}{{ .Arch }}{{ end }}
+      {{- if .Arm }}v{{ .Arm }}{{ end }}
+    # use zip for windows archives
+    format_overrides:
+      - goos: windows
+        format: zip
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+</file>
+
+<file path="Makefile">
+# Go Command Path
+GO ?= `which go`
+
+# GoRelease Command Path
+GORELEASER ?= `which goreleaser`
+
+GREEN = "\\033[0\;32m"
+BOLD = "\\033[1m"
+RESET = "\\033[0m"
+
+SPEC_URL = "https://api.redocly.com/registry/bundle/openhue/openhue/v2/openapi.yaml?branch=main"
+
+.PHONY: help
+help:
+	@grep -h -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "make \033[36m%-10s\033[0m %s\n", $$1, $$2}'
+
+.PHONY: generate
+generate: _check-oapi-codegen-installation ## Generates the openhue/gen/openhue.openhue.go client. Usage: make generate [spec=/path/to/openhue.yaml]
+ifdef spec
+	@echo "Code generation from $(spec)"
+	@oapi-codegen --package=gen -generate=client,types -o ./openhue/gen/openhue.openhue.go "$(spec)"
+else
+	@echo "Code generation from $(SPEC_URL)"
+	@oapi-codegen --package=gen -generate=client,types -o ./openhue/gen/openhue.openhue.go "$(SPEC_URL)"
+endif
+	@echo "\n${GREEN}${BOLD}./openhue/openhue.openhue.go successfully generated 🚀${RESET}"
+
+.PHONY: build
+build: _check-goreleaser-installation ## Generates the openhue-cli executables in the ./dist folder
+	@$(GORELEASER) check
+	@$(GORELEASER) build --clean --snapshot --single-target
+	@echo "\n${GREEN}${BOLD}openhue binaries successfully generated in the ./dist folder 📦${RESET}"
+
+.PHONY: tidy
+tidy: ## Tidy makes sure go.mod matches the source code in the module
+	@$(GO) mod tidy
+	@echo "\n${GREEN}${BOLD}go.mod successfully cleaned 🧽${RESET}"
+
+.PHONY: test
+test: ## Run the tests
+	@$(GO) test ./...
+	@echo "\n${GREEN}${BOLD}all tests successfully passed ✅ ${RESET}"
+
+.PHONY: coverage
+coverage: ## Run the tests with coverage. Usage: make coverage [html=true]
+	@$(GO) test ./... -coverprofile=c.out
+ifdef html
+	@$(GO) tool cover -html="c.out"
+else
+	@$(GO) tool cover -func="c.out"
+endif
+	@echo "\n${GREEN}${BOLD}all tests successfully passed ✅ ${RESET}"
+
+.PHONY: clean
+clean: ##
+	@rm -rf ./dist
+	@rm -f c.out
+	@rm -f coverage.html
+	@$(GO) clean
+	@echo "\n${GREEN}${BOLD}Project successfully cleaned 🧹${RESET} (removed ./dist folder + go clean)"
+
+#
+# Private targets
+#
+
+.PHONY: _check-goreleaser-installation
+_check-goreleaser-installation:
+	@command -v goreleaser >/dev/null 2>&1 || { echo >&2 "GoReleaser is not installed (https://goreleaser.com/install)"; exit 1; }
+
+.PHONY: _check-oapi-codegen-installation
+_check-oapi-codegen-installation:
+	@command -v oapi-codegen >/dev/null 2>&1 || { echo >&2 "oapi-codegen is not installed (https://github.com/oapi-codegen/oapi-codegen)"; exit 1; }
+</file>
+
+<file path="cmd/root.go">
+package cmd
+⋮----
+import (
+	op "github.com/openhue/openhue-go"
+	log "github.com/sirupsen/logrus"
+	"github.com/spf13/cobra"
+	"openhue-cli/cmd/get"
+	"openhue-cli/cmd/set"
+	"openhue-cli/cmd/setup"
+	"openhue-cli/cmd/version"
+	"openhue-cli/openhue"
+	"openhue-cli/util"
+)
+⋮----
+op "github.com/openhue/openhue-go"
+log "github.com/sirupsen/logrus"
+"github.com/spf13/cobra"
+"openhue-cli/cmd/get"
+"openhue-cli/cmd/set"
+"openhue-cli/cmd/setup"
+"openhue-cli/cmd/version"
+"openhue-cli/openhue"
+"openhue-cli/util"
+⋮----
+type OpenHueCmdGroup string
+⋮----
+const (
+	// OpenHueCmdGroupHue contains the actual commands to control the home
+	OpenHueCmdGroupHue = OpenHueCmdGroup("hue")
+⋮----
+// OpenHueCmdGroupHue contains the actual commands to control the home
+⋮----
+// OpenHueCmdGroupConfig contains the commands to configure the CLI
+⋮----
+// NewCmdOpenHue represents the `openhue` base command, AKA entry point of the CLI
+func NewCmdOpenHue(ctx *openhue.Context) *cobra.Command
+⋮----
+// LoadHomeIfNeeded checks if the command requires loading the openhue.HomeModel context
+func LoadHomeIfNeeded(ctx *openhue.Context, cmd *cobra.Command)
+⋮----
+// Execute adds all child commands to the root command and sets flags appropriately.
+// This is called by main.main(). It only needs to happen once to the rootCmd.
+func Execute(buildInfo *openhue.BuildInfo)
+⋮----
+// load the configuration
+⋮----
+// create the root command
+⋮----
+// add sub commands
+⋮----
+// execute the root command
+⋮----
+// containsCmd verifies if the given cobra.Command is contained in the group.
+func (g OpenHueCmdGroup) containsCmd(cmd *cobra.Command) bool
+</file>
+
+<file path="README.md">
+# OpenHue CLI
+[![Build](https://github.com/openhue/openhue-cli/actions/workflows/build.yml/badge.svg)](https://github.com/openhue/openhue-cli/actions/workflows/build.yml)
+[![CodeQL](https://github.com/openhue/openhue-cli/actions/workflows/github-code-scanning/codeql/badge.svg)](https://github.com/openhue/openhue-cli/actions/workflows/github-code-scanning/codeql)
+[![Maintainability with Code Climate](https://api.codeclimate.com/v1/badges/fb934bb37c36a04f8efd/maintainability)](https://codeclimate.com/github/openhue/openhue-cli/maintainability)
+[![Test Coverage](https://api.codeclimate.com/v1/badges/fb934bb37c36a04f8efd/test_coverage)](https://codeclimate.com/github/openhue/openhue-cli/test_coverage)
+[![Docker Image Size (tag)](https://img.shields.io/docker/image-size/openhue/cli/latest)](https://hub.docker.com/r/openhue/cli)
+
+## Overview
+
+OpenHue CLI is a command-line interface for interacting with Philips Hue smart lighting systems. 
+This tool provides a convenient way to control your Philips Hue lights and perform various tasks using the command line.
+
+[![How to setup OpenHue CLI](./docs/images/openhue_setup.gif)](https://www.openhue.io/cli/setup)
+
+## Features
+
+- Discover and connect to Philips Hue bridges.
+- List available lights and their status.
+- Control lights: on, off, brightness, and color.
+- Schedule light actions.
+
+For a complete list of features and usage, 
+please refer to the [OpenHue CLI online documentation](https://www.openhue.io/cli/openhue-cli).
+
+## Getting Started
+
+To begin developing with Open-Hue's OpenAPI specification, follow these steps:
+
+### Prerequisites
+
+Before you start, ensure that you have the following prerequisites installed:
+- [Golang](https://go.dev/doc/install) that is used to build and run the project
+- [GoReleaser](https://goreleaser.com) that is used to build and release the binaries. Used behind the scene when running the `make build` command
+- [oapi-codegen](https://github.com/oapi-codegen/oapi-codegen) (_optional_) that is used to generate the client code from the openhue-api specification. Used behind the scene when running the `make generate` command
+- [Docker](https://docs.docker.com/engine/install/) (_optional_) that is used to build the CLI Docker Image and run it as a container
+
+### Fork the Repository
+Before contributing to OpenHue CLI, it's a good practice to [fork](https://github.com/openhue/openhue-cli/fork) the repository to your own GitHub account.
+This will create a copy of the project that you can work on independently.
+
+### Build
+
+1. Clone the OpenHue CLI repository to your local machine:
+```shell
+git clone https://github.com/your-username/openhue-cli.git
+cd openhue-cli
+```
+2. Run the following command to build OpenHue CLI on your local environment:
+```shell
+make build
+```
+
+### Test
+Run the following command to execute all the tests and calculate the code coverage:
+```shell
+make test
+```
+If you want, you can also run the following command to visualize the coverage analysis in your browser: 
+```shell
+make coverage
+```
+> or use `make coverage html=true` to visualize the HTML report in your default web browser
+
+### Generate the OpenHue API Client
+Run the following command to generate the [OpenHue API Client](https://github.com/openhue/openhue-api): 
+```shell
+make generate
+```
+If there was any OpenAPI specification change, this command will update 
+the [`./openhue/gen/openhue.openhue.go`](./openhue/gen/openhue.openhue.go) file. 
+Please note that this file must never be manually edited!
+
+You also generate the client from another spec location:
+```
+make generate spec=/path/to/local/openhue.yaml
+```
+
+## License
+[![GitHub License](https://img.shields.io/github/license/openhue/openhue-cli)](https://github.com/openhue/openhue-cli/blob/main/LICENSE)
+
+Open-Hue is distributed under the [Apache License 2.0](http://www.apache.org/licenses/),
+making it open and free for anyone to use and contribute to.
+See the [license](./LICENSE) file for detailed terms.
+</file>
+
+<file path="go.mod">
+module openhue-cli
+
+go 1.22.3
+
+//replace (
+//	"github.com/openhue/openhue-go" => "/home/thibault.pensec/local/perso/openhue-go"
+//)
+
+require (
+	github.com/openhue/openhue-go v0.3.0
+	github.com/r3labs/sse/v2 v2.10.0
+	github.com/sirupsen/logrus v1.9.3
+	github.com/spf13/cobra v1.9.1
+	github.com/spf13/viper v1.20.1
+	github.com/stretchr/testify v1.10.0
+)
+
+require (
+	github.com/apapsch/go-jsonmerge/v2 v2.0.0 // indirect
+	github.com/cenkalti/backoff v2.2.1+incompatible // indirect
+	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
+	github.com/fsnotify/fsnotify v1.8.0 // indirect
+	github.com/go-viper/mapstructure/v2 v2.2.1 // indirect
+	github.com/google/uuid v1.6.0 // indirect
+	github.com/grandcat/zeroconf v1.0.0 // indirect
+	github.com/inconshreveable/mousetrap v1.1.0 // indirect
+	github.com/miekg/dns v1.1.61 // indirect
+	github.com/oapi-codegen/runtime v1.1.1 // indirect
+	github.com/pelletier/go-toml/v2 v2.2.3 // indirect
+	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
+	github.com/sagikazarmark/locafero v0.7.0 // indirect
+	github.com/sourcegraph/conc v0.3.0 // indirect
+	github.com/spf13/afero v1.12.0 // indirect
+	github.com/spf13/cast v1.7.1 // indirect
+	github.com/spf13/pflag v1.0.6 // indirect
+	github.com/stretchr/objx v0.5.2 // indirect
+	github.com/subosito/gotenv v1.6.0 // indirect
+	go.uber.org/multierr v1.11.0 // indirect
+	golang.org/x/mod v0.19.0 // indirect
+	golang.org/x/net v0.33.0 // indirect
+	golang.org/x/sync v0.10.0 // indirect
+	golang.org/x/sys v0.29.0 // indirect
+	golang.org/x/text v0.21.0 // indirect
+	golang.org/x/tools v0.23.0 // indirect
+	gopkg.in/cenkalti/backoff.v1 v1.1.0 // indirect
+	gopkg.in/yaml.v3 v3.0.1 // indirect
+)
+</file>
+
+</files>
+
+================
+File: .github/dependabot.yml
+================
+version: 2
+updates:
+  - package-ecosystem: gomod
+    directory: /
+    schedule:
+      interval: daily
+
+================
+File: cmd/get/get_events.go
+================
+package get
+⋮----
+import (
+	"crypto/tls"
+	"encoding/json"
+	"github.com/r3labs/sse/v2"
+	log "github.com/sirupsen/logrus"
+	"github.com/spf13/cobra"
+	"net/http"
+	"openhue-cli/openhue"
+	"openhue-cli/util"
+)
+⋮----
+"crypto/tls"
+"encoding/json"
+"github.com/r3labs/sse/v2"
+log "github.com/sirupsen/logrus"
+"github.com/spf13/cobra"
+"net/http"
+"openhue-cli/openhue"
+"openhue-cli/util"
+⋮----
+type HueEvent struct {
+	Id     string                   `json:"id"`
+	Events []map[string]interface{} `json:"events"`
+⋮----
+func NewCmdGetEvents(ctx *openhue.Context, c *CmdGetOptions) *cobra.Command
+⋮----
+func onEvent(ctx *openhue.Context) func(msg *sse.Event)
+⋮----
+//id := string(msg.ID)
+⋮----
+// createSseClient creates a fully initialized sse.Client to retrieve bridge events
+func createSseClient(ctx *openhue.Context) *sse.Client
+
+================
+File: cmd/setup/discover_test.go
+================
+package setup
+⋮----
+import (
+	"openhue-cli/openhue"
+	"openhue-cli/openhue/test/assert"
+	"testing"
+)
+⋮----
+"openhue-cli/openhue"
+"openhue-cli/openhue/test/assert"
+"testing"
+⋮----
+func TestNewCmdDiscover(t *testing.T)
+
+================
+File: cmd/setup/doc.go
+================
+// Package setup contains the commands that are used to configure and initialize the OpenHue CLI context
+package setup
+
+================
+File: cmd/setup/setup_test.go
+================
+package setup
+⋮----
+import (
+	"openhue-cli/openhue"
+	"openhue-cli/openhue/test/assert"
+	"testing"
+)
+⋮----
+"openhue-cli/openhue"
+"openhue-cli/openhue/test/assert"
+"testing"
+⋮----
+func TestNewCmdSetup(t *testing.T)
+
+================
+File: openhue/test/utils.go
+================
+package test
+⋮----
+import (
+	"math"
+)
+⋮----
+"math"
+⋮----
+// AlmostEqual32 returns true if a and b are equal within a relative error of e.
+// See http://floating-point-gui.de/errors/comparison/ for the details of the applied method.
+func AlmostEqual32(a, b, e float32) bool
+⋮----
+// Abs32 works like math.Abs, but for float32.
+func Abs32(x float32) float32
+⋮----
+return 0 // return correctly abs(-0)
+⋮----
+// Min32 works like math.Min, but for float32.
+func Min32(x, y float32) float32
+
+================
+File: openhue/buildinfo.go
+================
+package openhue
+⋮----
+type BuildInfo struct {
+	Version string
+	Commit  string
+	Date    string
+}
+⋮----
+// NewBuildInfo creates a new BuildInfo container
+func NewBuildInfo(version string, commit string, date string) *BuildInfo
+⋮----
+// NewTestBuildInfo returns a valid openhue.BuildInfo just for testing
+func NewTestBuildInfo() *BuildInfo
+
+================
+File: openhue/io_test.go
+================
+package openhue
+⋮----
+import (
+	"io"
+	"os"
+	"testing"
+)
+⋮----
+"io"
+"os"
+"testing"
+⋮----
+func TestNewIOSteams(t *testing.T)
+⋮----
+func TestNewTestIOStreams(t *testing.T)
+⋮----
+func TestNewTestIOStreamsDiscard(t *testing.T)
+
+================
+File: util/color/color.go
+================
+package color
+⋮----
+type RGB struct {
+	Red   int
+	Green int
+	Blue  int
+}
+⋮----
+type XY struct {
+	X          float32
+	Y          float32
+	Brightness float32
+}
+⋮----
+var UndefinedColor = XY{
+	X:          -1.0,
+	Y:          -1.0,
+	Brightness: -1.0,
+}
+⋮----
+// RGBHex Hexadecimal representation of an RGB color. Must start with '#'
+type RGBHex string
+⋮----
+// toXY converts a RGBHex value to its XY representation in CIE color space
+func (c *RGBHex) toXY() *XY
+
+================
+File: util/color/constant.go
+================
+package color
+⋮----
+import (
+	"fmt"
+	"strings"
+)
+⋮----
+"fmt"
+"strings"
+⋮----
+// The Table contains the list of supported colors by name
+var Table = map[RGBHex]*XY{
+	// basic colors
+	"white":   rgb("#FFFFFF").toXY(),
+	"red":     rgb("#FF0000").toXY(),
+	"lime":    rgb("#00FF00").toXY(),
+	"blue":    rgb("#0000FF").toXY(),
+	"yellow":  rgb("#FFFF00").toXY(),
+	"cyan":    rgb("#00FFFF").toXY(),
+	"aqua":    rgb("#00FFFF").toXY(),
+	"magenta": rgb("#FF00FF").toXY(),
+	"fuchsia": rgb("#FF00FF").toXY(),
+	"silver":  rgb("#C0C0C0").toXY(),
+	"gray":    rgb("#FF00FF").toXY(),
+	"maroon":  rgb("#808080").toXY(),
+	"olive":   rgb("#808000").toXY(),
+	"green":   rgb("#008000").toXY(),
+	"purple":  rgb("#800080").toXY(),
+	"teal":    rgb("#008080").toXY(),
+	"navy":    rgb("#000080").toXY(),
+
+	// more colors
+	"dark_red":                rgb("#8B0000").toXY(),
+	"brown":                   rgb("#A52A2A").toXY(),
+	"firebrick":               rgb("#B22222").toXY(),
+	"crimson":                 rgb("#DC143C").toXY(),
+	"tomato":                  rgb("#FF6347").toXY(),
+	"coral":                   rgb("#FF7F50").toXY(),
+	"indian_red":              rgb("#CD5C5C").toXY(),
+	"light_coral":             rgb("#F08080").toXY(),
+	"dark_salmon":             rgb("#E9967A").toXY(),
+	"salmon":                  rgb("#FA8072").toXY(),
+	"light_salmon":            rgb("#FFA07A").toXY(),
+	"orange_red":              rgb("#FF4500").toXY(),
+	"dark_orange":             rgb("#FF8C00").toXY(),
+	"orange":                  rgb("#FFA500").toXY(),
+	"gold":                    rgb("#FFD700").toXY(),
+	"dark_golden_rod":         rgb("#B8860B").toXY(),
+	"golden_rod":              rgb("#DAA520").toXY(),
+	"pale_golden_rod":         rgb("#EEE8AA").toXY(),
+	"dark_khaki":              rgb("#BDB76B").toXY(),
+	"khaki":                   rgb("#F0E68C").toXY(),
+	"yellow_green":            rgb("#9ACD32").toXY(),
+	"dark_olive_green":        rgb("#556B2F").toXY(),
+	"olive_drab":              rgb("#6B8E23").toXY(),
+	"lawn_green":              rgb("#7CFC00").toXY(),
+	"chartreuse":              rgb("#7FFF00").toXY(),
+	"green_yellow":            rgb("#ADFF2F").toXY(),
+	"dark_green":              rgb("#006400").toXY(),
+	"forest_green":            rgb("#228B22").toXY(),
+	"lime_green":              rgb("#32CD32").toXY(),
+	"light_green":             rgb("#90EE90").toXY(),
+	"pale_green":              rgb("#98FB98").toXY(),
+	"dark_sea_green":          rgb("#8FBC8F").toXY(),
+	"medium_spring_green":     rgb("#00FA9A").toXY(),
+	"spring_green":            rgb("#00FF7F").toXY(),
+	"sea_green":               rgb("#2E8B57").toXY(),
+	"medium_aqua_marine":      rgb("#66CDAA").toXY(),
+	"medium_sea_green":        rgb("#3CB371").toXY(),
+	"light_sea_green":         rgb("#20B2AA").toXY(),
+	"dark_slate_gray":         rgb("#2F4F4F").toXY(),
+	"dark_cyan":               rgb("#008B8B").toXY(),
+	"light_cyan":              rgb("#E0FFFF").toXY(),
+	"dark_turquoise":          rgb("#00CED1").toXY(),
+	"turquoise":               rgb("#40E0D0").toXY(),
+	"medium_turquoise":        rgb("#48D1CC").toXY(),
+	"pale_turquoise":          rgb("#AFEEEE").toXY(),
+	"aqua_marine":             rgb("#7FFFD4").toXY(),
+	"powder_blue":             rgb("#B0E0E6").toXY(),
+	"cadet_blue":              rgb("#5F9EA0").toXY(),
+	"steel_blue":              rgb("#4682B4").toXY(),
+	"corn_flower_blue":        rgb("#6495ED").toXY(),
+	"deep_sky_blue":           rgb("#00BFFF").toXY(),
+	"dodger_blue":             rgb("#1E90FF").toXY(),
+	"light_blue":              rgb("#ADD8E6").toXY(),
+	"sky_blue":                rgb("#87CEEB").toXY(),
+	"light_sky_blue":          rgb("#87CEFA").toXY(),
+	"midnight_blue":           rgb("#191970").toXY(),
+	"dark_blue":               rgb("#00008B").toXY(),
+	"medium_blue":             rgb("#0000CD").toXY(),
+	"royal_blue":              rgb("#4169E1").toXY(),
+	"blue_violet":             rgb("#8A2BE2").toXY(),
+	"indigo":                  rgb("#4B0082").toXY(),
+	"dark_slate_blue":         rgb("#483D8B").toXY(),
+	"slate_blue":              rgb("#6A5ACD").toXY(),
+	"medium_slate_blue":       rgb("#7B68EE").toXY(),
+	"medium_purple":           rgb("#9370DB").toXY(),
+	"dark_magenta":            rgb("#8B008B").toXY(),
+	"dark_violet":             rgb("#9400D3").toXY(),
+	"dark_orchid":             rgb("#9932CC").toXY(),
+	"medium_orchid":           rgb("#BA55D3").toXY(),
+	"thistle":                 rgb("#D8BFD8").toXY(),
+	"plum":                    rgb("#DDA0DD").toXY(),
+	"violet":                  rgb("#EE82EE").toXY(),
+	"orchid":                  rgb("#DA70D6").toXY(),
+	"medium_violet_red":       rgb("#C71585").toXY(),
+	"pale_violet_red":         rgb("#DB7093").toXY(),
+	"deep_pink":               rgb("#FF1493").toXY(),
+	"hot_pink":                rgb("#FF69B4").toXY(),
+	"light_pink":              rgb("#FFB6C1").toXY(),
+	"pink":                    rgb("#FFC0CB").toXY(),
+	"antique_white":           rgb("#FAEBD7").toXY(),
+	"beige":                   rgb("#F5F5DC").toXY(),
+	"bisque":                  rgb("#FFE4C4").toXY(),
+	"blanched_almond":         rgb("#FFEBCD").toXY(),
+	"wheat":                   rgb("#F5DEB3").toXY(),
+	"corn_silk":               rgb("#FFF8DC").toXY(),
+	"lemon_chiffon":           rgb("#FFFACD").toXY(),
+	"light golden rod yellow": rgb("#FAFAD2").toXY(),
+	"light_yellow":            rgb("#FFFFE0").toXY(),
+	"saddle_brown":            rgb("#8B4513").toXY(),
+	"sienna":                  rgb("#A0522D").toXY(),
+	"chocolate":               rgb("#D2691E").toXY(),
+	"peru":                    rgb("#CD853F").toXY(),
+	"sandy_brown":             rgb("#F4A460").toXY(),
+	"burly_wood":              rgb("#DEB887").toXY(),
+	"tan":                     rgb("#D2B48C").toXY(),
+	"rosy_brown":              rgb("#BC8F8F").toXY(),
+	"moccasin":                rgb("#FFE4B5").toXY(),
+	"navajo_white":            rgb("#FFDEAD").toXY(),
+	"peach_puff":              rgb("#FFDAB9").toXY(),
+	"misty_rose":              rgb("#FFE4E1").toXY(),
+	"lavender_blush":          rgb("#FFF0F5").toXY(),
+	"linen":                   rgb("#FAF0E6").toXY(),
+	"old_lace":                rgb("#FDF5E6").toXY(),
+	"papaya_whip":             rgb("#FFEFD5").toXY(),
+	"sea_shell":               rgb("#FFF5EE").toXY(),
+	"mint_cream":              rgb("#F5FFFA").toXY(),
+	"slate_gray":              rgb("#708090").toXY(),
+	"light_slate_gray":        rgb("#778899").toXY(),
+	"light_steel_blue":        rgb("#B0C4DE").toXY(),
+	"lavender":                rgb("#E6E6FA").toXY(),
+	"floral_white":            rgb("#FFFAF0").toXY(),
+	"alice_blue":              rgb("#F0F8FF").toXY(),
+	"ghost_white":             rgb("#F8F8FF").toXY(),
+	"honeydew":                rgb("#F0FFF0").toXY(),
+	"ivory":                   rgb("#FFFFF0").toXY(),
+	"azure":                   rgb("#F0FFFF").toXY(),
+	"snow":                    rgb("#FFFAFA").toXY(),
+	"dim_gray":                rgb("#696969").toXY(),
+	"dark_gray":               rgb("#A9A9A9").toXY(),
+	"light_gray":              rgb("#D3D3D3").toXY(),
+	"gainsboro":               rgb("#DCDCDC").toXY(),
+	"white_smoke":             rgb("#F5F5F5").toXY(),
+}
+⋮----
+// basic colors
+⋮----
+// more colors
+⋮----
+// GetSupportColorList returns the list of the supported colors contained in the Table map
+func GetSupportColorList() []string
+⋮----
+// FindColorByName helps find a XY color by its name
+func FindColorByName(name string) (*XY, error)
+⋮----
+// rgb Local helper function that returns a pointer to a RGBHex value
+func rgb(v RGBHex) *RGBHex
+
+================
+File: util/color/conversion_test.go
+================
+package color
+⋮----
+import (
+	"fmt"
+	"testing"
+)
+⋮----
+"fmt"
+"testing"
+⋮----
+func TestRGBToXY(t *testing.T)
+⋮----
+func TestNewRGBFromHex(t *testing.T)
+⋮----
+func assertRGBFromHexString(t *testing.T, hexStr string, r int, g int, b int)
+
+================
+File: util/metrics_test.go
+================
+package util
+⋮----
+import (
+	"github.com/stretchr/testify/assert"
+	"testing"
+	"time"
+)
+⋮----
+"github.com/stretchr/testify/assert"
+"testing"
+"time"
+⋮----
+func TestNewTimer(t *testing.T)
+
+================
+File: util/metrics.go
+================
+package util
+⋮----
+import "time"
+⋮----
+// NewTimer creates a new started Timer
+func NewTimer() *Timer
+⋮----
+// Timer can be used to monitor the execution time of a given method
+type Timer struct {
+	t0 time.Time
+}
+⋮----
+func (t *Timer) start() *Timer
+⋮----
+// Reset sets the Timer initial time to time.Now()
+func (t *Timer) Reset() *Timer
+⋮----
+// SinceInMillis returns the elapsed time in milliseconds since the Timer was started or Reset
+func (t *Timer) SinceInMillis() int64
+
+================
+File: LICENSE
+================
+Apache License
+                           Version 2.0, January 2004
+                        http://www.apache.org/licenses/
+
+   TERMS AND CONDITIONS FOR USE, REPRODUCTION, AND DISTRIBUTION
+
+   1. Definitions.
+
+      "License" shall mean the terms and conditions for use, reproduction,
+      and distribution as defined by Sections 1 through 9 of this document.
+
+      "Licensor" shall mean the copyright owner or entity authorized by
+      the copyright owner that is granting the License.
+
+      "Legal Entity" shall mean the union of the acting entity and all
+      other entities that control, are controlled by, or are under common
+      control with that entity. For the purposes of this definition,
+      "control" means (i) the power, direct or indirect, to cause the
+      direction or management of such entity, whether by contract or
+      otherwise, or (ii) ownership of fifty percent (50%) or more of the
+      outstanding shares, or (iii) beneficial ownership of such entity.
+
+      "You" (or "Your") shall mean an individual or Legal Entity
+      exercising permissions granted by this License.
+
+      "Source" form shall mean the preferred form for making modifications,
+      including but not limited to software source code, documentation
+      source, and configuration files.
+
+      "Object" form shall mean any form resulting from mechanical
+      transformation or translation of a Source form, including but
+      not limited to compiled object code, generated documentation,
+      and conversions to other media types.
+
+      "Work" shall mean the work of authorship, whether in Source or
+      Object form, made available under the License, as indicated by a
+      copyright notice that is included in or attached to the work
+      (an example is provided in the Appendix below).
+
+      "Derivative Works" shall mean any work, whether in Source or Object
+      form, that is based on (or derived from) the Work and for which the
+      editorial revisions, annotations, elaborations, or other modifications
+      represent, as a whole, an original work of authorship. For the purposes
+      of this License, Derivative Works shall not include works that remain
+      separable from, or merely link (or bind by name) to the interfaces of,
+      the Work and Derivative Works thereof.
+
+      "Contribution" shall mean any work of authorship, including
+      the original version of the Work and any modifications or additions
+      to that Work or Derivative Works thereof, that is intentionally
+      submitted to Licensor for inclusion in the Work by the copyright owner
+      or by an individual or Legal Entity authorized to submit on behalf of
+      the copyright owner. For the purposes of this definition, "submitted"
+      means any form of electronic, verbal, or written communication sent
+      to the Licensor or its representatives, including but not limited to
+      communication on electronic mailing lists, source code control systems,
+      and issue tracking systems that are managed by, or on behalf of, the
+      Licensor for the purpose of discussing and improving the Work, but
+      excluding communication that is conspicuously marked or otherwise
+      designated in writing by the copyright owner as "Not a Contribution."
+
+      "Contributor" shall mean Licensor and any individual or Legal Entity
+      on behalf of whom a Contribution has been received by Licensor and
+      subsequently incorporated within the Work.
+
+   2. Grant of Copyright License. Subject to the terms and conditions of
+      this License, each Contributor hereby grants to You a perpetual,
+      worldwide, non-exclusive, no-charge, royalty-free, irrevocable
+      copyright license to reproduce, prepare Derivative Works of,
+      publicly display, publicly perform, sublicense, and distribute the
+      Work and such Derivative Works in Source or Object form.
+
+   3. Grant of Patent License. Subject to the terms and conditions of
+      this License, each Contributor hereby grants to You a perpetual,
+      worldwide, non-exclusive, no-charge, royalty-free, irrevocable
+      (except as stated in this section) patent license to make, have made,
+      use, offer to sell, sell, import, and otherwise transfer the Work,
+      where such license applies only to those patent claims licensable
+      by such Contributor that are necessarily infringed by their
+      Contribution(s) alone or by combination of their Contribution(s)
+      with the Work to which such Contribution(s) was submitted. If You
+      institute patent litigation against any entity (including a
+      cross-claim or counterclaim in a lawsuit) alleging that the Work
+      or a Contribution incorporated within the Work constitutes direct
+      or contributory patent infringement, then any patent licenses
+      granted to You under this License for that Work shall terminate
+      as of the date such litigation is filed.
+
+   4. Redistribution. You may reproduce and distribute copies of the
+      Work or Derivative Works thereof in any medium, with or without
+      modifications, and in Source or Object form, provided that You
+      meet the following conditions:
+
+      (a) You must give any other recipients of the Work or
+          Derivative Works a copy of this License; and
+
+      (b) You must cause any modified files to carry prominent notices
+          stating that You changed the files; and
+
+      (c) You must retain, in the Source form of any Derivative Works
+          that You distribute, all copyright, patent, trademark, and
+          attribution notices from the Source form of the Work,
+          excluding those notices that do not pertain to any part of
+          the Derivative Works; and
+
+      (d) If the Work includes a "NOTICE" text file as part of its
+          distribution, then any Derivative Works that You distribute must
+          include a readable copy of the attribution notices contained
+          within such NOTICE file, excluding those notices that do not
+          pertain to any part of the Derivative Works, in at least one
+          of the following places: within a NOTICE text file distributed
+          as part of the Derivative Works; within the Source form or
+          documentation, if provided along with the Derivative Works; or,
+          within a display generated by the Derivative Works, if and
+          wherever such third-party notices normally appear. The contents
+          of the NOTICE file are for informational purposes only and
+          do not modify the License. You may add Your own attribution
+          notices within Derivative Works that You distribute, alongside
+          or as an addendum to the NOTICE text from the Work, provided
+          that such additional attribution notices cannot be construed
+          as modifying the License.
+
+      You may add Your own copyright statement to Your modifications and
+      may provide additional or different license terms and conditions
+      for use, reproduction, or distribution of Your modifications, or
+      for any such Derivative Works as a whole, provided Your use,
+      reproduction, and distribution of the Work otherwise complies with
+      the conditions stated in this License.
+
+   5. Submission of Contributions. Unless You explicitly state otherwise,
+      any Contribution intentionally submitted for inclusion in the Work
+      by You to the Licensor shall be under the terms and conditions of
+      this License, without any additional terms or conditions.
+      Notwithstanding the above, nothing herein shall supersede or modify
+      the terms of any separate license agreement you may have executed
+      with Licensor regarding such Contributions.
+
+   6. Trademarks. This License does not grant permission to use the trade
+      names, trademarks, service marks, or product names of the Licensor,
+      except as required for reasonable and customary use in describing the
+      origin of the Work and reproducing the content of the NOTICE file.
+
+   7. Disclaimer of Warranty. Unless required by applicable law or
+      agreed to in writing, Licensor provides the Work (and each
+      Contributor provides its Contributions) on an "AS IS" BASIS,
+      WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
+      implied, including, without limitation, any warranties or conditions
+      of TITLE, NON-INFRINGEMENT, MERCHANTABILITY, or FITNESS FOR A
+      PARTICULAR PURPOSE. You are solely responsible for determining the
+      appropriateness of using or redistributing the Work and assume any
+      risks associated with Your exercise of permissions under this License.
+
+   8. Limitation of Liability. In no event and under no legal theory,
+      whether in tort (including negligence), contract, or otherwise,
+      unless required by applicable law (such as deliberate and grossly
+      negligent acts) or agreed to in writing, shall any Contributor be
+      liable to You for damages, including any direct, indirect, special,
+      incidental, or consequential damages of any character arising as a
+      result of this License or out of the use or inability to use the
+      Work (including but not limited to damages for loss of goodwill,
+      work stoppage, computer failure or malfunction, or any and all
+      other commercial damages or losses), even if such Contributor
+      has been advised of the possibility of such damages.
+
+   9. Accepting Warranty or Additional Liability. While redistributing
+      the Work or Derivative Works thereof, You may choose to offer,
+      and charge a fee for, acceptance of support, warranty, indemnity,
+      or other liability obligations and/or rights consistent with this
+      License. However, in accepting such obligations, You may act only
+      on Your own behalf and on Your sole responsibility, not on behalf
+      of any other Contributor, and only if You agree to indemnify,
+      defend, and hold each Contributor harmless for any liability
+      incurred by, or claims asserted against, such Contributor by reason
+      of your accepting any such warranty or additional liability.
+
+   END OF TERMS AND CONDITIONS
+
+   APPENDIX: How to apply the Apache License to your work.
+
+      To apply the Apache License to your work, attach the following
+      boilerplate notice, with the fields enclosed by brackets "[]"
+      replaced with your own identifying information. (Don't include
+      the brackets!)  The text should be enclosed in the appropriate
+      comment syntax for the file format. We also recommend that a
+      file or class name and description of purpose be included on the
+      same "printed page" as the copyright notice for easier
+      identification within third-party archives.
+
+   Copyright [yyyy] [name of copyright owner]
+
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+
+================
+File: cmd/get/get_scene_test.go
+================
+package get
+⋮----
+import (
+	oh "github.com/openhue/openhue-go"
+	"github.com/stretchr/testify/assert"
+	"openhue-cli/openhue"
+	"testing"
+)
+⋮----
+oh "github.com/openhue/openhue-go"
+"github.com/stretchr/testify/assert"
+"openhue-cli/openhue"
+"testing"
+⋮----
+func TestGetAllScenes(t *testing.T)
+⋮----
+func NewFakeHome() *openhue.HomeModel
+
+================
+File: cmd/get/get_scene.go
+================
+package get
+⋮----
+import (
+	"github.com/spf13/cobra"
+	"openhue-cli/openhue"
+	"openhue-cli/util"
+	"strconv"
+)
+⋮----
+"github.com/spf13/cobra"
+"openhue-cli/openhue"
+"openhue-cli/util"
+"strconv"
+⋮----
+type SceneOptions struct {
+	*CmdGetOptions
+	Room string
+}
+⋮----
+// NewCmdGetScene returns initialized Command instance for the 'get scene' sub command
+func NewCmdGetScene(ctx *openhue.Context, co *CmdGetOptions) *cobra.Command
+⋮----
+func (o *SceneOptions) RunGetSceneCmd(ctx *openhue.Context, args []string)
+⋮----
+var scenes []openhue.Scene
+⋮----
+func PrintScene(scene openhue.Scene) string
+
+================
+File: cmd/set/common.go
+================
+package set
+⋮----
+import (
+	"fmt"
+	"github.com/spf13/cobra"
+	"openhue-cli/openhue"
+	"openhue-cli/util/color"
+)
+⋮----
+"fmt"
+"github.com/spf13/cobra"
+"openhue-cli/openhue"
+"openhue-cli/util/color"
+⋮----
+//
+// Set Light flags, used by the 'set light' and 'set room' commands
+⋮----
+type CmdSetLightFlags struct {
+	On          bool
+	Off         bool
+	Brightness  float32
+	Rgb         string
+	X           float32
+	Y           float32
+	ColorName   string
+	Temperature int
+}
+⋮----
+func (flags *CmdSetLightFlags) initCmd(cmd *cobra.Command)
+⋮----
+// on/off flags
+⋮----
+// Brightness flag
+⋮----
+//
+// Color flags
+⋮----
+// rgb
+⋮----
+// xy
+⋮----
+// name
+⋮----
+// temperature
+⋮----
+// exclusions
+⋮----
+// toSetLightOptions makes sure provided values for LightOptions are valid
+func (flags *CmdSetLightFlags) toSetLightOptions() (*openhue.SetLightOptions, error)
+⋮----
+// validate the --brightness flag
+⋮----
+// validate the temperature flag
+⋮----
+// color in RGB
+⋮----
+// color in CIE space
+⋮----
+// color from enum
+
+================
+File: cmd/set/set_scene.go
+================
+package set
+⋮----
+import (
+	"errors"
+	oh "github.com/openhue/openhue-go"
+	log "github.com/sirupsen/logrus"
+	"github.com/spf13/cobra"
+	"openhue-cli/openhue"
+)
+⋮----
+"errors"
+oh "github.com/openhue/openhue-go"
+log "github.com/sirupsen/logrus"
+"github.com/spf13/cobra"
+"openhue-cli/openhue"
+⋮----
+const (
+	setSceneDocShort = "Activate a scene"
+	setSceneDocLong  = `
+This command allows the activate a scene using either a static or a dynamic palette.
+`
+	setSceneDocExample = `
+# Activate a scene
+openhue set scene Soho
+
+# Activate a scene by ID
+openhue set scene 62af7df3-d390-4408-a7ac-4b6b8805531b
+
+# Activate a scene in a specific room
+openhue set scene Soho -r Studio
+
+# Activate a scene with a dynamic palette
+openhue set scene Soho -a dynamic`
+)
+⋮----
+type CmdSetSceneOptions struct {
+	action actionEnum
+	room   string
+}
+⋮----
+// NewCmdSetScene returns initialized cobra.Command instance for the 'set scene' sub command
+func NewCmdSetScene(ctx *openhue.Context) *cobra.Command
+⋮----
+// action flag
+⋮----
+type actionEnum string
+⋮----
+const (
+	active  actionEnum = "active"
+	static  actionEnum = "static"
+	dynamic actionEnum = "dynamic"
+)
+⋮----
+// String is used both by fmt.Print and by Cobra in help text
+func (e *actionEnum) String() string
+⋮----
+// Set must have pointer receiver so it doesn't change the value of a copy
+func (e *actionEnum) Set(v string) error
+⋮----
+// Type is only used in help text
+func (e *actionEnum) Type() string
+⋮----
+func (e *actionEnum) toSceneRecallAction() oh.SceneRecallAction
+⋮----
+func (o *CmdSetSceneOptions) roomMsg() string
+
+================
+File: cmd/setup/config_test.go
+================
+package setup
+⋮----
+import (
+	"openhue-cli/openhue"
+	"openhue-cli/openhue/test/assert"
+	"testing"
+)
+⋮----
+"openhue-cli/openhue"
+"openhue-cli/openhue/test/assert"
+"testing"
+⋮----
+func TestNewCmdConfigure(t *testing.T)
+
+================
+File: openhue/test/assert/assert.go
+================
+package assert
+⋮----
+import (
+	"github.com/spf13/cobra"
+	"testing"
+)
+⋮----
+"github.com/spf13/cobra"
+"testing"
+⋮----
+// ThatLineEqualsTo verifies that an `idx` line contained in the `lines` slice should be equal to the `expected` value
+func ThatLineEqualsTo(t *testing.T, lines []string, idx int, expected string)
+⋮----
+// ThatCmdUseIs verifies that the command Use is valid
+func ThatCmdUseIs(t *testing.T, cmd *cobra.Command, expectedUse string)
+⋮----
+// ThatCmdGroupIs verifies that the command GroupID is valid
+func ThatCmdGroupIs(t *testing.T, cmd *cobra.Command, expectedGroup string)
+
+================
+File: openhue/buildinfo_test.go
+================
+package openhue
+⋮----
+import (
+	"github.com/stretchr/testify/assert"
+	"testing"
+)
+⋮----
+"github.com/stretchr/testify/assert"
+"testing"
+⋮----
+func TestNewTestBuildInfo(t *testing.T)
+
+================
+File: util/color/color_test.go
+================
+package color
+⋮----
+import "testing"
+⋮----
+func TestConvertHexToXY(t *testing.T)
+⋮----
+var c RGBHex = "#123456"
+⋮----
+func TestFailToConvertHexToXY(t *testing.T)
+⋮----
+var c RGBHex = "#foo"
+
+================
+File: util/color/constant_test.go
+================
+package color
+⋮----
+import (
+	"openhue-cli/openhue/test"
+	"testing"
+)
+⋮----
+"openhue-cli/openhue/test"
+"testing"
+⋮----
+func TestFindColorByName(t *testing.T)
+⋮----
+func TestCannotFindColorByName(t *testing.T)
+
+================
+File: util/color/conversion.go
+================
+package color
+⋮----
+import (
+	"errors"
+	"math"
+	"strconv"
+)
+⋮----
+"errors"
+"math"
+"strconv"
+⋮----
+// ToXY RGB to XY conversion
+// Based on https://developers.meethue.com/develop/application-design-guidance/color-conversion-formulas-rgb-to-xy-and-back/
+func (c *RGB) ToXY() *XY
+⋮----
+// Gamma correction
+⋮----
+// Convert the RGB values to XYZ using the Wide RGB D65 conversion formula
+⋮----
+// Calculate the xy values from the XYZ values
+⋮----
+// NewRGBFomHex Converts a hexadecimal string representation of a color to its RGB value.
+// Example: #FF0000 will return RGB{255, 0, 0}
+func NewRGBFomHex(hex string) (*RGB, error)
+⋮----
+func gammaCorrection(color *float32)
+
+================
+File: util/logger/logger.go
+================
+package logger
+⋮----
+import (
+	log "github.com/sirupsen/logrus"
+	"os"
+)
+⋮----
+log "github.com/sirupsen/logrus"
+"os"
+⋮----
+func Init(path string)
+⋮----
+// If the file doesn't exist, create it or append to the file
+⋮----
+func isProd() bool
+
+================
+File: Dockerfile
+================
+FROM scratch
+COPY openhue /
+ENTRYPOINT ["/openhue"]
+
+================
+File: cmd/set/set_room.go
+================
+package set
+⋮----
+import (
+	"github.com/spf13/cobra"
+	"openhue-cli/openhue"
+)
+⋮----
+"github.com/spf13/cobra"
+"openhue-cli/openhue"
+⋮----
+const (
+	setRoomDocShort = "Update one or multiple rooms (on/off, brightness, color)"
+⋮----
+// NewCmdSetRoom returns initialized cobra.Command instance for the 'set room' sub command
+func NewCmdSetRoom(ctx *openhue.Context) *cobra.Command
+
+================
+File: cmd/setup/config.go
+================
+package setup
+⋮----
+import (
+	"github.com/spf13/cobra"
+	"openhue-cli/openhue"
+)
+⋮----
+"github.com/spf13/cobra"
+"openhue-cli/openhue"
+⋮----
+const (
+	docShortConfigure = `Manual openhue CLI setup`
+	docLongConfigure  = `
+The setup command must be run as a prerequisite for all resource related commands (controlling lights, rooms, scenes, etc.)
+⋮----
+type Options struct {
+	bridge string
+	key    string
+}
+⋮----
+// NewCmdConfigure creates the configure command
+func NewCmdConfigure(io openhue.IOStreams) *cobra.Command
+
+================
+File: cmd/version/version_test.go
+================
+package version
+⋮----
+import (
+	"openhue-cli/openhue"
+	"openhue-cli/openhue/test/assert"
+	"strings"
+	"testing"
+)
+⋮----
+"openhue-cli/openhue"
+"openhue-cli/openhue/test/assert"
+"strings"
+"testing"
+⋮----
+const (
+	Line1 = "#  Version\t 1.0.0"
+	Line2 = "#   Commit\t https://github.com/openhue/openhue-cli/commit/1234"
+	Line3 = "# Built at\t now"
+)
+⋮----
+func TestNewCmdVersion(t *testing.T)
+
+================
+File: cmd/version/version.go
+================
+package version
+⋮----
+import (
+	"github.com/spf13/cobra"
+	"openhue-cli/openhue"
+)
+⋮----
+"github.com/spf13/cobra"
+"openhue-cli/openhue"
+⋮----
+const (
+	BaseCommitUrl = "https://github.com/openhue/openhue-cli/commit/"
+)
+⋮----
+func NewCmdVersion(ctx *openhue.Context) *cobra.Command
+
+================
+File: openhue/home_context.go
+================
+package openhue
+⋮----
+import (
+	"github.com/openhue/openhue-go"
+	log "github.com/sirupsen/logrus"
+)
+⋮----
+"github.com/openhue/openhue-go"
+log "github.com/sirupsen/logrus"
+⋮----
+type hueHomeCtx struct {
+	h *openhue.Home
+	// context
+	home          *openhue.BridgeHomeGet
+	rooms         map[string]openhue.RoomGet
+	devices       map[string]openhue.DeviceGet
+	lights        map[string]openhue.LightGet
+	groupedLights map[string]openhue.GroupedLightGet
+	scenes        map[string]openhue.SceneGet
+}
+⋮----
+// context
+⋮----
+func loadHueHomeCtx(home *openhue.Home) (*hueHomeCtx, error)
+
+================
+File: openhue/io.go
+================
+package openhue
+⋮----
+import (
+	"bytes"
+	"fmt"
+	log "github.com/sirupsen/logrus"
+	"io"
+	"os"
+)
+⋮----
+"bytes"
+"fmt"
+log "github.com/sirupsen/logrus"
+"io"
+"os"
+⋮----
+type Console interface {
+	Printf(format string, a ...any)
+	Println(a ...any)
+
+	ErrPrintf(format string, a ...any)
+	ErrPrintln(a ...any)
+}
+⋮----
+// IOStreams provides the standard names for io streams.
+// This is useful for embedding and for unit testing.
+type IOStreams struct {
+	Console
+	// In think, os.Stdin
+	In io.Reader
+	// Out think, os.Stdout
+	Out io.Writer
+	// ErrOut think, os.Stderr
+	ErrOut io.Writer
+}
+⋮----
+// In think, os.Stdin
+⋮----
+// Out think, os.Stdout
+⋮----
+// ErrOut think, os.Stderr
+⋮----
+// NewIOStreams returns a valid IOStreams with the default os.Stdin, os.Stdout and os.Stderr thinks
+func NewIOStreams() IOStreams
+⋮----
+// NewTestIOStreams returns a valid IOStreams and in, out, errOut buffers for unit tests
+func NewTestIOStreams() (IOStreams, *bytes.Buffer, *bytes.Buffer, *bytes.Buffer)
+⋮----
+// NewTestIOStreamsDiscard returns a valid IOStreams that just discards
+func NewTestIOStreamsDiscard() IOStreams
+⋮----
+//
+// Console implementation
+⋮----
+func (io *IOStreams) Printf(format string, a ...any)
+⋮----
+func (io *IOStreams) Println(a ...any)
+⋮----
+func (io *IOStreams) ErrPrintf(format string, a ...any)
+⋮----
+func (io *IOStreams) ErrPrintln(a ...any)
+
+================
+File: util/utils_test.go
+================
+package util
+⋮----
+import (
+	"openhue-cli/openhue"
+	"openhue-cli/openhue/test/assert"
+	"strings"
+	"testing"
+)
+⋮----
+"openhue-cli/openhue"
+"openhue-cli/openhue/test/assert"
+"strings"
+"testing"
+⋮----
+type Light struct {
+	Id   string `json:"id"`
+	Name string `json:"name"`
+}
+⋮----
+func PrintLightLineProcessor(light Light) string
+⋮----
+func TestPrintTable(t *testing.T)
+⋮----
+func TestPrintJsonArrayWithOneElement(t *testing.T)
+⋮----
+func TestPrintJsonArrayWithTwoElements(t *testing.T)
+
+================
+File: util/utils.go
+================
+package util
+⋮----
+import (
+	"encoding/json"
+	"fmt"
+	"openhue-cli/openhue"
+	"text/tabwriter"
+)
+⋮----
+"encoding/json"
+"fmt"
+"openhue-cli/openhue"
+"text/tabwriter"
+⋮----
+// PrintJsonArray formats the input array as JSON and prints it. If the length of the array is equal to 1,
+// it will print it as a single object
+func PrintJsonArray[T any](streams openhue.IOStreams, array []T)
+⋮----
+func PrintJson[T any](io openhue.IOStreams, array T)
+⋮----
+var out []byte
+⋮----
+// PrintTable prints each line of the objects contained in the table value
+func PrintTable[T any](io openhue.IOStreams, table []T, lineFn func(T) string, header ...string)
+
+================
+File: .codeclimate.yml
+================
+plugins:
+  gofmt:
+    enabled: true
+  govet:
+    enabled: true
+
+# We don't want the scan and analyze generated code
+exclude_patterns:
+  - openhue/gen/openhue.openhue.go
+
+================
+File: openhue/context_test.go
+================
+package openhue
+⋮----
+import (
+	"github.com/openhue/openhue-go"
+	"github.com/stretchr/testify/assert"
+	"testing"
+)
+⋮----
+"github.com/openhue/openhue-go"
+"github.com/stretchr/testify/assert"
+"testing"
+⋮----
+func TestNewContext(t *testing.T)
+⋮----
+func TestNewTestContextWithoutApi(t *testing.T)
+
+================
+File: openhue/home_service_test.go
+================
+package openhue
+⋮----
+import (
+	"github.com/openhue/openhue-go"
+	"github.com/stretchr/testify/assert"
+	"testing"
+)
+⋮----
+"github.com/openhue/openhue-go"
+"github.com/stretchr/testify/assert"
+"testing"
+⋮----
+var home = mockHome()
+⋮----
+func TestFindAllLights(t *testing.T)
+⋮----
+func TestFindLightsByName(t *testing.T)
+⋮----
+func TestFindLightsByIds(t *testing.T)
+⋮----
+func TestFindAllRooms(t *testing.T)
+⋮----
+func TestFindRoomsByName(t *testing.T)
+⋮----
+func TestFindRoomById(t *testing.T)
+⋮----
+//
+// internal
+⋮----
+func mockHome() *HomeModel
+⋮----
+func mockRoom(name string) Room
+⋮----
+func mockDeviceWithLight(parent Room, name string) Device
+
+================
+File: .gitignore
+================
+# IntelliJ folder
+.idea/
+*.iml
+
+# CMake
+cmake-build-*/
+
+# File-based project format
+*.iws
+
+# IntelliJ
+out/
+
+# Crashlytics plugin (for Android Studio and IntelliJ)
+com_crashlytics_export_strings.xml
+crashlytics.properties
+crashlytics-build.properties
+fabric.properties
+
+### Go template
+# If you prefer the allow list template instead of the deny list, see community template:
+# https://github.com/github/gitignore/blob/main/community/Golang/Go.AllowList.gitignore
+#
+# Binaries for programs and plugins
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test binary, built with `go test -c`
+*.test
+
+# Output of the go coverage tool, specifically when used with LiteIDE
+*.out
+coverage.html
+
+# Go workspace file
+go.work
+
+# Build folder
+bin/
+
+# Gorelease build folder
+dist/
+
+================
+File: cmd/get/get_light.go
+================
+package get
+⋮----
+import (
+	"fmt"
+	"github.com/spf13/cobra"
+	"openhue-cli/openhue"
+	"openhue-cli/util"
+)
+⋮----
+"fmt"
+"github.com/spf13/cobra"
+"openhue-cli/openhue"
+"openhue-cli/util"
+⋮----
+const (
+	docLongGetLight = `
+Fetches and displays all available lights
+`
+	docExampleGetLight = `
+# List all lights as a table
+openhue get lights
+
+# List all lights as JSON
+openhue get lights --json
+
+# Get details for a single light
+openhue get light aa31ba26-98a7-4830-8ae9-1b7caa8b5700 --json
+
+# Get light by name
+openhue get light "Hue Go"
+
+# List all lights for a specific room
+openhue get light --room "Living Room"
+`
+)
+⋮----
+type LightOptions struct {
+	*CmdGetOptions
+	Room string
+}
+⋮----
+// NewCmdGetLight returns initialized Command instance for the 'get light' sub command
+func NewCmdGetLight(ctx *openhue.Context, co *CmdGetOptions) *cobra.Command
+⋮----
+func (o *LightOptions) RunGetLightCmd(ctx *openhue.Context, args []string)
+⋮----
+func PrintLight(light openhue.Light) string
+⋮----
+room := light.Parent.Parent.Name // parent of a light is the device that belongs to a room
+
+================
+File: cmd/get/get_room.go
+================
+package get
+⋮----
+import (
+	"fmt"
+	"github.com/spf13/cobra"
+	"openhue-cli/openhue"
+	"openhue-cli/util"
+)
+⋮----
+"fmt"
+"github.com/spf13/cobra"
+"openhue-cli/openhue"
+"openhue-cli/util"
+⋮----
+const (
+	docLongGetRoom = `
+Fetches and displays all available rooms from the Philips Hue bridge
+`
+	docExampleGetRoom = `
+# List all rooms as a table
+openhue get room
+
+# List all rooms as JSON
+openhue get room --json
+
+# Get details for a single room
+openhue get room aa31ba26-98a7-4830-8ae9-1b7caa8b5700 --json
+
+# Get room by name
+openhue get room -n "Studio"
+`
+)
+⋮----
+// NewCmdGetRoom returns initialized Command instance for the 'get light' sub command
+func NewCmdGetRoom(ctx *openhue.Context, o *CmdGetOptions) *cobra.Command
+⋮----
+func RunGetRoomCmd(ctx *openhue.Context, o *CmdGetOptions, args []string)
+⋮----
+func PrintRoom(room openhue.Room) string
+
+================
+File: cmd/setup/discover.go
+================
+package setup
+⋮----
+import (
+	oh "github.com/openhue/openhue-go"
+	"github.com/spf13/cobra"
+	"openhue-cli/openhue"
+	"time"
+)
+⋮----
+oh "github.com/openhue/openhue-go"
+"github.com/spf13/cobra"
+"openhue-cli/openhue"
+"time"
+⋮----
+// NewCmdDiscover represents the discover command
+func NewCmdDiscover(io openhue.IOStreams) *cobra.Command
+
+================
+File: cmd/setup/setup.go
+================
+package setup
+⋮----
+import (
+	"fmt"
+	oh "github.com/openhue/openhue-go"
+	log "github.com/sirupsen/logrus"
+	"github.com/spf13/cobra"
+	"openhue-cli/openhue"
+	"os"
+	"time"
+)
+⋮----
+"fmt"
+oh "github.com/openhue/openhue-go"
+log "github.com/sirupsen/logrus"
+"github.com/spf13/cobra"
+"openhue-cli/openhue"
+"os"
+"time"
+⋮----
+const hueBridgeDiscover = "https://discovery.meethue.com"
+⋮----
+type CmdSetupOptions struct {
+	deviceType        string
+	generateClientKey bool
+	bridge            string
+}
+⋮----
+func NewCmdSetup(io openhue.IOStreams) *cobra.Command
+⋮----
+func startSetup(io openhue.IOStreams, o *CmdSetupOptions)
+⋮----
+// this is an expected error, we just wait for the user to push the button
+⋮----
+// this is unexpected, let's print the error and exit
+⋮----
+func getBridgeIPAddress(io openhue.IOStreams, o *CmdSetupOptions) (string, error)
+⋮----
+func saveConfig(bridge string, key string) (string, error)
+⋮----
+func getHostName() string
+
+================
+File: openhue/context.go
+================
+package openhue
+⋮----
+import (
+	"bytes"
+	"github.com/openhue/openhue-go"
+)
+⋮----
+"bytes"
+"github.com/openhue/openhue-go"
+⋮----
+// Context contains the common objects for the different commands.
+type Context struct {
+	Io        IOStreams
+	BuildInfo *BuildInfo
+	H         *openhue.Home
+	Home      *HomeModel
+	Config    *Config
+}
+⋮----
+// NewContext returns an initialized Context from a given openhue.ClientWithResponses API with default IOStreams
+func NewContext(io IOStreams, buildInfo *BuildInfo, home *openhue.Home, config *Config) *Context
+⋮----
+// NewTestContext returns a Context for testing usage only and the out buffer to validate
+// the command output.
+// The Api field of the returned Context is not set.
+func NewTestContext(home *HomeModel) (*Context, *bytes.Buffer)
+
+================
+File: openhue/home_service.go
+================
+package openhue
+⋮----
+import (
+	"fmt"
+	"github.com/openhue/openhue-go"
+	log "github.com/sirupsen/logrus"
+)
+⋮----
+"fmt"
+"github.com/openhue/openhue-go"
+log "github.com/sirupsen/logrus"
+⋮----
+func LoadHome(h *openhue.Home) (*HomeModel, error)
+⋮----
+Parent: nil, // explicitly set Parent to nil as HomeModel is the root object
+⋮----
+//
+// Light
+⋮----
+// SearchLights returns a slice of Light optionally filtered by their room and their IDs or names
+func SearchLights(home *HomeModel, roomNameOrId string, nameOrIds []string) []Light
+⋮----
+var lights []Light
+⋮----
+// Room
+⋮----
+func SearchRooms(home *HomeModel, nameOrIds []string) []Room
+⋮----
+var rooms []Room
+⋮----
+// Scene
+⋮----
+// SearchScenes returns a slice of Scene filtered by the room
+func SearchScenes(home *HomeModel, roomNameOrId string, nameOrIds []string) []Scene
+⋮----
+var scenes []Scene
+⋮----
+// Private
+⋮----
+func (t HomeResourceType) is(r openhue.ResourceIdentifierRtype) bool
+⋮----
+func getRooms(ctx *hueHomeCtx, parent *Resource, children *[]openhue.ResourceIdentifier) []Room
+⋮----
+// getScenes returns a slice of Scene that belong to a given Room
+func getScenes(ctx *hueHomeCtx, room *Resource) []Scene
+⋮----
+func getDevices(ctx *hueHomeCtx, parent *Resource, children *[]openhue.ResourceIdentifier) []Device
+⋮----
+var devices []Device
+⋮----
+func getGroupedLight(ctx *hueHomeCtx, parent *Resource, services *[]openhue.ResourceIdentifier) (*GroupedLight, error)
+⋮----
+func getLight(ctx *hueHomeCtx, parent *Resource, services *[]openhue.ResourceIdentifier) (*Light, error)
+
+================
+File: .github/workflows/build.yml
+================
+# PR Builder Action
+
+name: Build
+
+on:
+  # Triggers the workflow on push or pull request events but only for the "main" branch
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: actions/setup-go@v4
+        with:
+          go-version: '1.22.3'
+
+      - name: Test & publish code coverage
+        uses: paambaati/codeclimate-action@v5.0.0
+        env:
+          CC_TEST_REPORTER_ID: 64da8b499e15dc84234cbe4ff019d5d533718ca6768807d2aa0057f56add2e8c
+        with:
+          coverageCommand: make coverage
+          debug: true
+          prefix: ${{ github.event.repository.name }}
+          coverageLocations:
+            "${{github.workspace}}/c.out:gocov"
+
+================
+File: .github/workflows/release.yml
+================
+# Packaging & Releasing OpenHue CLI
+
+name: Release
+on:
+  push:
+    tags:
+      - '*'
+
+permissions:
+  contents: write
+
+jobs:
+  goreleaser:
+    runs-on: ubuntu-latest
+    steps:
+
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: Fetch all tags
+        run: git fetch --force --tags
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.21'
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Run GoReleaser
+        uses: goreleaser/goreleaser-action@v5
+        with:
+          distribution: goreleaser
+          version: latest
+          args: release --clean
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          OPENHUE_HOMEBREW_CLI_TOKEN: ${{ secrets.OPENHUE_HOMEBREW_CLI_TOKEN }}
+
+================
+File: cmd/set/set.go
+================
+package set
+⋮----
+import (
+	"github.com/spf13/cobra"
+	"openhue-cli/openhue"
+)
+⋮----
+"github.com/spf13/cobra"
+"openhue-cli/openhue"
+⋮----
+// NewCmdSet returns an initialized Command instance for 'set' sub command
+func NewCmdSet(ctx *openhue.Context) *cobra.Command
+
+================
+File: openhue/home_model.go
+================
+package openhue
+⋮----
+import (
+	"github.com/openhue/openhue-go"
+	"github.com/spf13/cobra"
+	"openhue-cli/util/color"
+)
+⋮----
+"github.com/openhue/openhue-go"
+"github.com/spf13/cobra"
+"openhue-cli/util/color"
+⋮----
+type HomeResourceType openhue.ResourceIdentifierRtype
+⋮----
+type Resource struct {
+	Id     string
+	Name   string
+	Type   HomeResourceType
+	Parent *Resource
+	// internal
+	ctx *hueHomeCtx
+}
+⋮----
+// internal
+⋮----
+// matchesNameOrId returns true of the given parameter equals either the Resource Name or Id.
+// If the parameter is empty, true is returned.
+func (r *Resource) matchesNameOrId(nameOrId string) bool
+⋮----
+//
+// HomeModel
+⋮----
+type HomeModel struct {
+	Resource
+	Rooms   []Room
+	Devices []Device
+	HueData *openhue.BridgeHomeGet
+}
+⋮----
+// Room
+⋮----
+type Room struct {
+	Resource
+	Devices []Device
+	Scenes  []Scene
+	HueData *openhue.RoomGet
+
+	// Services
+	GroupedLight *GroupedLight
+}
+⋮----
+// Services
+⋮----
+// Device
+⋮----
+type Device struct {
+	Resource
+	HueData *openhue.DeviceGet
+
+	// Services
+	Light *Light
+}
+⋮----
+// Light
+⋮----
+type SetLightOptions struct {
+	Status      LightStatus
+	Brightness  float32
+	Color       color.XY
+	Temperature int
+}
+⋮----
+func NewSetLightOptions() *SetLightOptions
+⋮----
+type LightStatus string
+⋮----
+const (
+	LightStatusOn        LightStatus = "on"
+	LightStatusOff       LightStatus = "off"
+	LightStatusUndefined LightStatus = "undefined"
+)
+⋮----
+// ToBool converts a LightStatus to its bool value. LightStatusUndefined is considered as false.
+func ToBool(status LightStatus) *bool
+⋮----
+type LightService interface {
+	IsOn() bool
+	Set(options SetLightOptions)
+}
+⋮----
+type Light struct {
+	Resource
+	LightService
+	HueData *openhue.LightGet
+}
+⋮----
+func (light *Light) IsOn() bool
+⋮----
+func (light *Light) Set(o *SetLightOptions)
+⋮----
+type GroupedLight struct {
+	Resource
+	LightService
+	HueData *openhue.GroupedLightGet
+}
+⋮----
+// Scene
+⋮----
+type SceneService interface {
+	Activate()
+}
+⋮----
+type Scene struct {
+	Resource
+	SceneService
+	HueData *openhue.SceneGet
+}
+⋮----
+func (scene *Scene) Activate(action openhue.SceneRecallAction) error
+
+================
+File: cmd/set/set_light.go
+================
+package set
+⋮----
+import (
+	log "github.com/sirupsen/logrus"
+	"github.com/spf13/cobra"
+	"openhue-cli/openhue"
+)
+⋮----
+log "github.com/sirupsen/logrus"
+"github.com/spf13/cobra"
+"openhue-cli/openhue"
+⋮----
+const (
+	docShort = "Update one or multiple lights (on/off, brightness, color)"
+⋮----
+var room = ""
+⋮----
+// NewCmdSetLight returns initialized Command instance for the 'set light' sub command
+func NewCmdSetLight(ctx *openhue.Context) *cobra.Command
+
+================
+File: cmd/get/get.go
+================
+package get
+⋮----
+import (
+	oh "github.com/openhue/openhue-go"
+	"github.com/spf13/cobra"
+	"openhue-cli/openhue"
+	"openhue-cli/util"
+)
+⋮----
+oh "github.com/openhue/openhue-go"
+"github.com/spf13/cobra"
+"openhue-cli/openhue"
+"openhue-cli/util"
+⋮----
+type CmdGetOptions struct {
+	Json bool
+}
+⋮----
+// NewCmdGet returns an initialized Command instance for 'get' sub command
+func NewCmdGet(ctx *openhue.Context) *cobra.Command
+⋮----
+// local flags
+⋮----
+// persistence flags
+⋮----
+// sub commands
+⋮----
+func RunGetAllResources(ctx *openhue.Context, typeFlag string, o *CmdGetOptions)
+⋮----
+var resources []oh.ResourceGet
+⋮----
+func PrintResource(resource oh.ResourceGet) string
+
+================
+File: main.go
+================
+package main
+⋮----
+//go:generate make generate
+⋮----
+import (
+	"openhue-cli/cmd"
+	"openhue-cli/openhue"
+)
+⋮----
+"openhue-cli/cmd"
+"openhue-cli/openhue"
+⋮----
+var (
+	version = "dev"
+	commit  = "none"
+	date    = "unknown"
+)
+⋮----
+func main()
+
+================
+File: openhue/config.go
+================
+package openhue
+⋮----
+import (
+	"context"
+	"crypto/tls"
+	"errors"
+	"fmt"
+	"github.com/openhue/openhue-go"
+	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
+	"net/http"
+	"openhue-cli/util/logger"
+	"os"
+	"path/filepath"
+	"slices"
+)
+⋮----
+"context"
+"crypto/tls"
+"errors"
+"fmt"
+"github.com/openhue/openhue-go"
+"github.com/spf13/cobra"
+"github.com/spf13/viper"
+"net/http"
+"openhue-cli/util/logger"
+"os"
+"path/filepath"
+"slices"
+⋮----
+// CommandsWithNoConfig contains the list of commands that don't require the configuration to exist
+var CommandsWithNoConfig = []string{"setup", "config", "help", "discover", "auth", "version", "completion"}
+var configPath string
+⋮----
+func init()
+⋮----
+// Find home directory.
+⋮----
+type Config struct {
+	// The IP of the Philips HUE Bridge
+	Bridge string
+	// The HUE Application Key
+	Key string
+}
+⋮----
+// The IP of the Philips HUE Bridge
+⋮----
+// The HUE Application Key
+⋮----
+func (c *Config) GetConfigFile() string
+⋮----
+func (c *Config) Load()
+⋮----
+// When trying to run CLI without configuration
+⋮----
+func (c *Config) Save() (string, error)
+⋮----
+// NewOpenHueClient Creates a new NewClientWithResponses for a given server and hueApplicationKey.
+// This function will also skip SSL verification, as the Philips HUE Bridge exposes a self-signed certificate.
+func (c *Config) NewOpenHueClient() *openhue.ClientWithResponses
+⋮----
+// skip SSL Verification
+⋮----
+// NewOpenHueClientNoAuth Creates a new NewClientWithResponses for a given server and no application Key.
+⋮----
+func NewOpenHueClientNoAuth(ip string) *openhue.ClientWithResponses
+
+================
+File: .goreleaser.yaml
+================
+project_name: openhue
+
+before:
+  hooks:
+    - go mod tidy
+
+universal_binaries:
+  - id: openhue
+    replace: true
+
+builds:
+  - id: openhue
+    binary: openhue
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - windows
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+
+dockers:
+  - id: openhue
+    image_templates:
+      - openhue/cli:latest
+      - openhue/cli:{{ .Tag }}
+    build_flag_templates:
+      - "--pull"
+      - "--label=org.opencontainers.image.created={{.Date}}"
+      - "--label=org.opencontainers.image.title={{.ProjectName}}"
+      - "--label=org.opencontainers.image.description={{.ProjectName}}"
+      - "--label=org.opencontainers.image.revision={{.FullCommit}}"
+      - "--label=org.opencontainers.image.version={{.Version}}"
+      - "--label=org.opencontainers.image.url=https://github.com/openhue/openhue-cli"
+
+brews:
+  - name: openhue-cli
+    homepage: https://github.com/openhue/homebrew-cli
+    description: OpenHue CLI is a command-line interface for interacting with Philips Hue smart lighting systems
+    license: Apache License 2.0
+    repository:
+      owner: openhue
+      name: homebrew-cli
+      token: "{{ .Env.OPENHUE_HOMEBREW_CLI_TOKEN }}"
+
+archives:
+  - id: openhue
+    format: tar.gz
+    # this name template makes the OS and Arch compatible with the results of `uname`.
+    name_template: >-
+      {{ .ProjectName }}_
+      {{- title .Os }}_
+      {{- if eq .Arch "amd64" }}x86_64
+      {{- else if eq .Arch "386" }}i386
+      {{- else }}{{ .Arch }}{{ end }}
+      {{- if .Arm }}v{{ .Arm }}{{ end }}
+    # use zip for windows archives
+    format_overrides:
+      - goos: windows
+        format: zip
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+
+================
+File: Makefile
+================
+# Go Command Path
+GO ?= `which go`
+
+# GoRelease Command Path
+GORELEASER ?= `which goreleaser`
+
+GREEN = "\\033[0\;32m"
+BOLD = "\\033[1m"
+RESET = "\\033[0m"
+
+SPEC_URL = "https://api.redocly.com/registry/bundle/openhue/openhue/v2/openapi.yaml?branch=main"
+
+.PHONY: help
+help:
+	@grep -h -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "make \033[36m%-10s\033[0m %s\n", $$1, $$2}'
+
+.PHONY: generate
+generate: _check-oapi-codegen-installation ## Generates the openhue/gen/openhue.openhue.go client. Usage: make generate [spec=/path/to/openhue.yaml]
+ifdef spec
+	@echo "Code generation from $(spec)"
+	@oapi-codegen --package=gen -generate=client,types -o ./openhue/gen/openhue.openhue.go "$(spec)"
+else
+	@echo "Code generation from $(SPEC_URL)"
+	@oapi-codegen --package=gen -generate=client,types -o ./openhue/gen/openhue.openhue.go "$(SPEC_URL)"
+endif
+	@echo "\n${GREEN}${BOLD}./openhue/openhue.openhue.go successfully generated 🚀${RESET}"
+
+.PHONY: build
+build: _check-goreleaser-installation ## Generates the openhue-cli executables in the ./dist folder
+	@$(GORELEASER) check
+	@$(GORELEASER) build --clean --snapshot --single-target
+	@echo "\n${GREEN}${BOLD}openhue binaries successfully generated in the ./dist folder 📦${RESET}"
+
+.PHONY: tidy
+tidy: ## Tidy makes sure go.mod matches the source code in the module
+	@$(GO) mod tidy
+	@echo "\n${GREEN}${BOLD}go.mod successfully cleaned 🧽${RESET}"
+
+.PHONY: test
+test: ## Run the tests
+	@$(GO) test ./...
+	@echo "\n${GREEN}${BOLD}all tests successfully passed ✅ ${RESET}"
+
+.PHONY: coverage
+coverage: ## Run the tests with coverage. Usage: make coverage [html=true]
+	@$(GO) test ./... -coverprofile=c.out
+ifdef html
+	@$(GO) tool cover -html="c.out"
+else
+	@$(GO) tool cover -func="c.out"
+endif
+	@echo "\n${GREEN}${BOLD}all tests successfully passed ✅ ${RESET}"
+
+.PHONY: clean
+clean: ##
+	@rm -rf ./dist
+	@rm -f c.out
+	@rm -f coverage.html
+	@$(GO) clean
+	@echo "\n${GREEN}${BOLD}Project successfully cleaned 🧹${RESET} (removed ./dist folder + go clean)"
+
+#
+# Private targets
+#
+
+.PHONY: _check-goreleaser-installation
+_check-goreleaser-installation:
+	@command -v goreleaser >/dev/null 2>&1 || { echo >&2 "GoReleaser is not installed (https://goreleaser.com/install)"; exit 1; }
+
+.PHONY: _check-oapi-codegen-installation
+_check-oapi-codegen-installation:
+	@command -v oapi-codegen >/dev/null 2>&1 || { echo >&2 "oapi-codegen is not installed (https://github.com/oapi-codegen/oapi-codegen)"; exit 1; }
+
+================
+File: cmd/root.go
+================
+package cmd
+⋮----
+import (
+	op "github.com/openhue/openhue-go"
+	log "github.com/sirupsen/logrus"
+	"github.com/spf13/cobra"
+	"openhue-cli/cmd/get"
+	"openhue-cli/cmd/set"
+	"openhue-cli/cmd/setup"
+	"openhue-cli/cmd/version"
+	"openhue-cli/openhue"
+	"openhue-cli/util"
+)
+⋮----
+op "github.com/openhue/openhue-go"
+log "github.com/sirupsen/logrus"
+"github.com/spf13/cobra"
+"openhue-cli/cmd/get"
+"openhue-cli/cmd/set"
+"openhue-cli/cmd/setup"
+"openhue-cli/cmd/version"
+"openhue-cli/openhue"
+"openhue-cli/util"
+⋮----
+type OpenHueCmdGroup string
+⋮----
+const (
+	// OpenHueCmdGroupHue contains the actual commands to control the home
+	OpenHueCmdGroupHue = OpenHueCmdGroup("hue")
+⋮----
+// OpenHueCmdGroupHue contains the actual commands to control the home
+⋮----
+// OpenHueCmdGroupConfig contains the commands to configure the CLI
+⋮----
+// NewCmdOpenHue represents the `openhue` base command, AKA entry point of the CLI
+func NewCmdOpenHue(ctx *openhue.Context) *cobra.Command
+⋮----
+// LoadHomeIfNeeded checks if the command requires loading the openhue.HomeModel context
+func LoadHomeIfNeeded(ctx *openhue.Context, cmd *cobra.Command)
+⋮----
+// Execute adds all child commands to the root command and sets flags appropriately.
+// This is called by main.main(). It only needs to happen once to the rootCmd.
+func Execute(buildInfo *openhue.BuildInfo)
+⋮----
+// load the configuration
+⋮----
+// create the root command
+⋮----
+// add sub commands
+⋮----
+// execute the root command
+⋮----
+// containsCmd verifies if the given cobra.Command is contained in the group.
+func (g OpenHueCmdGroup) containsCmd(cmd *cobra.Command) bool
+
+================
+File: README.md
+================
+# OpenHue CLI
+[![Build](https://github.com/openhue/openhue-cli/actions/workflows/build.yml/badge.svg)](https://github.com/openhue/openhue-cli/actions/workflows/build.yml)
+[![CodeQL](https://github.com/openhue/openhue-cli/actions/workflows/github-code-scanning/codeql/badge.svg)](https://github.com/openhue/openhue-cli/actions/workflows/github-code-scanning/codeql)
+[![Maintainability with Code Climate](https://api.codeclimate.com/v1/badges/fb934bb37c36a04f8efd/maintainability)](https://codeclimate.com/github/openhue/openhue-cli/maintainability)
+[![Test Coverage](https://api.codeclimate.com/v1/badges/fb934bb37c36a04f8efd/test_coverage)](https://codeclimate.com/github/openhue/openhue-cli/test_coverage)
+[![Docker Image Size (tag)](https://img.shields.io/docker/image-size/openhue/cli/latest)](https://hub.docker.com/r/openhue/cli)
+
+## Overview
+
+OpenHue CLI is a command-line interface for interacting with Philips Hue smart lighting systems. 
+This tool provides a convenient way to control your Philips Hue lights and perform various tasks using the command line.
+
+[![How to setup OpenHue CLI](./docs/images/openhue_setup.gif)](https://www.openhue.io/cli/setup)
+
+## Features
+
+- Discover and connect to Philips Hue bridges.
+- List available lights and their status.
+- Control lights: on, off, brightness, and color.
+- Schedule light actions.
+
+For a complete list of features and usage, 
+please refer to the [OpenHue CLI online documentation](https://www.openhue.io/cli/openhue-cli).
+
+## Getting Started
+
+To begin developing with Open-Hue's OpenAPI specification, follow these steps:
+
+### Prerequisites
+
+Before you start, ensure that you have the following prerequisites installed:
+- [Golang](https://go.dev/doc/install) that is used to build and run the project
+- [GoReleaser](https://goreleaser.com) that is used to build and release the binaries. Used behind the scene when running the `make build` command
+- [oapi-codegen](https://github.com/oapi-codegen/oapi-codegen) (_optional_) that is used to generate the client code from the openhue-api specification. Used behind the scene when running the `make generate` command
+- [Docker](https://docs.docker.com/engine/install/) (_optional_) that is used to build the CLI Docker Image and run it as a container
+
+### Fork the Repository
+Before contributing to OpenHue CLI, it's a good practice to [fork](https://github.com/openhue/openhue-cli/fork) the repository to your own GitHub account.
+This will create a copy of the project that you can work on independently.
+
+### Build
+
+1. Clone the OpenHue CLI repository to your local machine:
+```shell
+git clone https://github.com/your-username/openhue-cli.git
+cd openhue-cli
+```
+2. Run the following command to build OpenHue CLI on your local environment:
+```shell
+make build
+```
+
+### Test
+Run the following command to execute all the tests and calculate the code coverage:
+```shell
+make test
+```
+If you want, you can also run the following command to visualize the coverage analysis in your browser: 
+```shell
+make coverage
+```
+> or use `make coverage html=true` to visualize the HTML report in your default web browser
+
+### Generate the OpenHue API Client
+Run the following command to generate the [OpenHue API Client](https://github.com/openhue/openhue-api): 
+```shell
+make generate
+```
+If there was any OpenAPI specification change, this command will update 
+the [`./openhue/gen/openhue.openhue.go`](./openhue/gen/openhue.openhue.go) file. 
+Please note that this file must never be manually edited!
+
+You also generate the client from another spec location:
+```
+make generate spec=/path/to/local/openhue.yaml
+```
+
+## License
+[![GitHub License](https://img.shields.io/github/license/openhue/openhue-cli)](https://github.com/openhue/openhue-cli/blob/main/LICENSE)
+
+Open-Hue is distributed under the [Apache License 2.0](http://www.apache.org/licenses/),
+making it open and free for anyone to use and contribute to.
+See the [license](./LICENSE) file for detailed terms.
+
+================
+File: go.mod
+================
+module openhue-cli
+
+go 1.22.3
+
+//replace (
+//	"github.com/openhue/openhue-go" => "/home/thibault.pensec/local/perso/openhue-go"
+//)
+
+require (
+	github.com/openhue/openhue-go v0.3.0
+	github.com/r3labs/sse/v2 v2.10.0
+	github.com/sirupsen/logrus v1.9.3
+	github.com/spf13/cobra v1.9.1
+	github.com/spf13/viper v1.20.1
+	github.com/stretchr/testify v1.10.0
+)
+
+require (
+	github.com/apapsch/go-jsonmerge/v2 v2.0.0 // indirect
+	github.com/cenkalti/backoff v2.2.1+incompatible // indirect
+	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
+	github.com/fsnotify/fsnotify v1.8.0 // indirect
+	github.com/go-viper/mapstructure/v2 v2.2.1 // indirect
+	github.com/google/uuid v1.6.0 // indirect
+	github.com/grandcat/zeroconf v1.0.0 // indirect
+	github.com/inconshreveable/mousetrap v1.1.0 // indirect
+	github.com/miekg/dns v1.1.61 // indirect
+	github.com/oapi-codegen/runtime v1.1.1 // indirect
+	github.com/pelletier/go-toml/v2 v2.2.3 // indirect
+	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
+	github.com/sagikazarmark/locafero v0.7.0 // indirect
+	github.com/sourcegraph/conc v0.3.0 // indirect
+	github.com/spf13/afero v1.12.0 // indirect
+	github.com/spf13/cast v1.7.1 // indirect
+	github.com/spf13/pflag v1.0.6 // indirect
+	github.com/stretchr/objx v0.5.2 // indirect
+	github.com/subosito/gotenv v1.6.0 // indirect
+	go.uber.org/multierr v1.11.0 // indirect
+	golang.org/x/mod v0.19.0 // indirect
+	golang.org/x/net v0.33.0 // indirect
+	golang.org/x/sync v0.10.0 // indirect
+	golang.org/x/sys v0.29.0 // indirect
+	golang.org/x/text v0.21.0 // indirect
+	golang.org/x/tools v0.23.0 // indirect
+	gopkg.in/cenkalti/backoff.v1 v1.1.0 // indirect
+	gopkg.in/yaml.v3 v3.0.1 // indirect
+)
+
+
+
+================================================================
+End of Codebase
+================================================================

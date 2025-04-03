@@ -1,0 +1,1 @@
+openhue get --type room | awk 'NR>3 && $1 ~ /^[0-9a-f]{8}-/ {print "openhue set room "$1" --on"}'

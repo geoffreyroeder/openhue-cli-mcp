@@ -1,6 +1,10 @@
 # IntelliJ folder
 .idea/
 *.iml
+dist/
+# macos
+.DS_Store
+
 
 # CMake
 cmake-build-*/

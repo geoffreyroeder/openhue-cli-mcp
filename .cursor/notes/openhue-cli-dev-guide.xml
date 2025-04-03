@@ -1,0 +1,275 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<openhue-cli-dev-guide>
+    <code_patterns>
+        <pattern name="add_command">
+            <description>Standard pattern for adding a new command to the CLI</description>
+            <steps>
+                <step>Create a new file in the appropriate cmd/{category} directory</step>
+                <step>Implement a New{Command} function that returns a cobra.Command</step>
+                <step>Define command documentation constants</step>
+                <step>Add command options struct if needed</step>
+                <step>Add the command to the parent command in its NewCmd{Parent} function</step>
+            </steps>
+            <example>
+                <![CDATA[
+// in cmd/get/get_new_resource.go
+package get
+
+import (
+    "github.com/spf13/cobra"
+    "openhue-cli/openhue"
+    "openhue-cli/util"
+)
+
+const (
+    docShortGetNewResource = "Get new resource"
+    docLongGetNewResource  = `
+Fetches and displays all available new resources
+`
+    docExampleGetNewResource = `
+# List all new resources
+openhue get newresource
+`
+)
+
+type NewResourceOptions struct {
+    *CmdGetOptions
+    Filter string
+}
+
+// NewCmdGetNewResource returns initialized Command instance for the 'get newresource' command
+func NewCmdGetNewResource(ctx *openhue.Context, co *CmdGetOptions) *cobra.Command {
+    o := NewResourceOptions{
+        CmdGetOptions: co,
+    }
+    
+    cmd := &cobra.Command{
+        Use:     "newresource [id]",
+        Aliases: []string{"newresources"},
+        Short:   docShortGetNewResource,
+        Long:    docLongGetNewResource,
+        Example: docExampleGetNewResource,
+        Args:    cobra.RangeArgs(0, 1),
+        Run: func(cmd *cobra.Command, args []string) {
+            o.RunGetNewResourceCmd(ctx, args)
+        },
+    }
+    
+    cmd.Flags().StringVarP(&o.Filter, "filter", "f", "", "Filter resources by property")
+    
+    return cmd
+}
+
+func (o *NewResourceOptions) RunGetNewResourceCmd(ctx *openhue.Context, args []string) {
+    // Implementation
+}
+
+// Then in cmd/get/get.go, add:
+// root.AddCommand(NewCmdGetNewResource(ctx, o))
+                ]]>
+            </example>
+        </pattern>
+        
+        <pattern name="error_handling">
+            <description>Standard error handling pattern</description>
+            <example>
+                <![CDATA[
+// Use cobra.CheckErr for command-level errors
+err := doSomething()
+cobra.CheckErr(err)
+
+// Use log.Warning for non-critical errors
+if err != nil {
+    log.Warning(err)
+}
+
+// Return errors from functions to be handled upstream
+func myFunction() (*Result, error) {
+    data, err := fetchData()
+    if err != nil {
+        return nil, fmt.Errorf("failed to fetch data: %w", err)
+    }
+    return data, nil
+}
+                ]]>
+            </example>
+        </pattern>
+        
+        <pattern name="model_implementation">
+            <description>Pattern for implementing a new model type</description>
+            <example>
+                <![CDATA[
+// In openhue/home_model.go, add:
+type NewResource struct {
+    Resource
+    HueData *openhue.NewResourceGet
+    // Additional fields
+}
+
+func (resource *NewResource) IsAvailable() bool {
+    return resource.HueData.Status.Available
+}
+
+// In openhue/home_service.go, add:
+func SearchNewResources(home *HomeModel, filters []string) []NewResource {
+    var resources []NewResource
+    
+    // Implementation
+    
+    return resources
+}
+
+// Add to HomeModel loading in LoadHome function
+                ]]>
+            </example>
+        </pattern>
+    </code_patterns>
+    
+    <file_structure>
+        <component name="commands">
+            <file path="cmd/root.go">Root command definition and registration of all subcommands</file>
+            <file path="cmd/get/get.go">Registration of all "get" commands</file>
+            <file path="cmd/set/set.go">Registration of all "set" commands</file>
+            <file path="cmd/setup/setup.go">Setup/configuration commands</file>
+        </component>
+        
+        <component name="models">
+            <file path="openhue/home_model.go">Core data structures for Hue resources</file>
+            <file path="openhue/home_service.go">Service methods for searching/managing resources</file>
+            <file path="openhue/home_context.go">Internal context for Hue API data</file>
+        </component>
+        
+        <component name="core">
+            <file path="openhue/context.go">Application context definition</file>
+            <file path="openhue/config.go">Configuration loading/saving</file>
+            <file path="openhue/io.go">IO stream handling</file>
+        </component>
+        
+        <component name="utilities">
+            <file path="util/color/color.go">Color handling utilities</file>
+            <file path="util/utils.go">General utilities for output formatting</file>
+            <file path="util/logger/logger.go">Logging configuration</file>
+        </component>
+    </file_structure>
+    
+    <configuration>
+        <standard_locations>
+            <location name="config_file" value="$HOME/.openhue/config.yaml">Main configuration file</location>
+        </standard_locations>
+        
+        <config_structure>
+            <property name="Bridge">IP address of the Philips HUE Bridge</property>
+            <property name="Key">The HUE Application Key</property>
+        </config_structure>
+        
+        <example>
+            <![CDATA[
+// Reading config
+func (c *Config) Load() {
+    if err := viper.ReadInConfig(); err != nil {
+        // Handle error
+    }
+    
+    c.Bridge = viper.GetString("bridge")
+    c.Key = viper.GetString("key")
+}
+
+// Saving config
+func (c *Config) Save() (string, error) {
+    viper.Set("bridge", c.Bridge)
+    viper.Set("key", c.Key)
+    
+    return viper.ConfigFileUsed(), viper.WriteConfig()
+}
+            ]]>
+        </example>
+    </configuration>
+    
+    <testing>
+        <pattern name="command_testing">
+            <description>Pattern for testing commands</description>
+            <example>
+                <![CDATA[
+func TestNewCmdGetResource(t *testing.T) {
+    ctx, out := openhue.NewTestContext(nil)
+    cmd := NewCmdGetResource(ctx, &CmdGetOptions{})
+    
+    assert.ThatCmdUseIs(t, cmd, "resource [id]")
+    assert.NotNil(t, cmd.Run)
+}
+                ]]>
+            </example>
+        </pattern>
+        
+        <pattern name="model_testing">
+            <description>Pattern for testing models</description>
+            <example>
+                <![CDATA[
+func TestSearchResources(t *testing.T) {
+    home := mockHome()
+    resources := SearchResources(home, []string{})
+    
+    assert.NotNil(t, resources)
+    assert.Len(t, resources, 2)
+}
+
+func mockHome() *HomeModel {
+    // Create a mock home model for testing
+}
+                ]]>
+            </example>
+        </pattern>
+        
+        <mocking>
+            <description>Common patterns for creating test mocks</description>
+            <example>
+                <![CDATA[
+// Creating a test HomeModel
+func NewFakeHome() *openhue.HomeModel {
+    return &openhue.HomeModel{
+        Resource: openhue.Resource{
+            Id:   "test-home",
+            Name: "Test Home",
+            Type: openhue.HomeResourceType("bridge_home"),
+        },
+        Rooms: []openhue.Room{
+            // Mock rooms
+        },
+    }
+}
+                ]]>
+            </example>
+        </mocking>
+    </testing>
+    
+    <common_tasks>
+        <task name="add_command">
+            <description>Steps to add a new command</description>
+            <steps>
+                <step>Create a new file in the appropriate cmd/ directory</step>
+                <step>Implement the command structure following existing patterns</step>
+                <step>Add the command to the parent command registration</step>
+                <step>Write tests for the command</step>
+            </steps>
+        </task>
+        
+        <task name="add_resource_type">
+            <description>Steps to add a new resource type</description>
+            <steps>
+                <step>Add the new type to openhue/home_model.go</step>
+                <step>Add search functions to openhue/home_service.go</step>
+                <step>Update the HomeModel loading in LoadHome function</step>
+                <step>Add commands to interact with the resource</step>
+            </steps>
+        </task>
+        
+        <task name="modify_config">
+            <description>Steps to modify configuration</description>
+            <steps>
+                <step>Update the Config struct in openhue/config.go</step>
+                <step>Update the Load and Save methods</step>
+                <step>Update command flags that use the configuration</step>
+            </steps>
+        </task>
+    </common_tasks>
+</openhue-cli-dev-guide> 
